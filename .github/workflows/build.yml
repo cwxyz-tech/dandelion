@@ -1,5 +1,5 @@
 # Builds Dandelion.app on a real Mac on every push.
-# Push a tag like v1.0 and it also publishes a release with the zipped app.
+# When VERSION holds a number that hasn't been released yet, it also publishes that release (.dmg and .zip).
 name: Build
 
 on:
@@ -39,13 +39,15 @@ jobs:
             Dandelion.zip
             Dandelion.dmg
 
+      # A new number in VERSION (pushed to main) publishes a release tagged with it, like v1.0.
       - name: Publish a release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $GITHUB_REF_NAME already exists; leaving it as is."; exit 0
+          TAG="v$(tr -d ' \n\r' < VERSION)"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; nothing to publish."; exit 0
           fi
           {
             echo "Free and open-source disk space visualizer for Mac. macOS 14 or later, Apple silicon and Intel."
@@ -61,6 +63,6 @@ jobs:
             shasum -a 256 Dandelion.dmg Dandelion.zip
             echo '```'
           } > notes.md
-          gh release create "$GITHUB_REF_NAME" Dandelion.dmg Dandelion.zip \
-            --repo "$GITHUB_REPOSITORY" --title "Dandelion ${GITHUB_REF_NAME#v}" \
+          gh release create "$TAG" Dandelion.dmg Dandelion.zip \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Dandelion ${TAG#v}" \
             --notes-file notes.md

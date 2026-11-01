@@ -26,6 +26,10 @@ lipo -create $BINS -output "$APP/Contents/MacOS/Dandelion"
 rm -f build/Dandelion-*
 
 cp Info.plist "$APP/Contents/Info.plist"
+if [ -f VERSION ]; then
+  V="$(tr -d ' \n\r' < VERSION)"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $V" "$APP/Contents/Info.plist"
+fi
 iconutil -c icns Icon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
 
 # ad-hoc signature: required to run on Apple Silicon (no Apple developer account needed)

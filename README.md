@@ -36,7 +36,7 @@ Then drag `build/Dandelion.app` into Applications. An app you build yourself ope
 
 ## Downloading a build instead
 
-Every push is built on a Mac by GitHub Actions (`.github/workflows/build.yml`). Tagging a commit `v1.1` publishes a release with `Dandelion.dmg` and `Dandelion.zip`.
+Every push is built on a Mac by GitHub Actions (`.github/workflows/build.yml`). Putting a new number in `VERSION` (like `1.1`) publishes a release with `Dandelion.dmg` and `Dandelion.zip`, with their SHA-256 checksums in the notes.
 
 Open the .dmg and drag Dandelion onto Applications. Downloaded builds are ad-hoc signed, not notarized, so the first launch gets blocked. To open it: try to open it once, then go to **System Settings → Privacy & Security** and click **Open Anyway**. Or in Terminal:
 
