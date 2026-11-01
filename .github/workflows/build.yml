@@ -1,0 +1,52 @@
+# Builds Dandelion.app on a real Mac on every push.
+# Push a tag like v1.0 and it also publishes a release with the zipped app.
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Get the code
+        run: |
+          git init --quiet .
+          git fetch --quiet --depth 1 "https://github.com/$GITHUB_REPOSITORY.git" "$GITHUB_SHA"
+          git checkout --quiet FETCH_HEAD
+
+      - name: Build
+        run: sh build.sh
+
+      - name: Zip and disk image
+        run: |
+          ditto -c -k --keepParent build/Dandelion.app Dandelion.zip
+          sh make-dmg.sh && cp build/Dandelion.dmg Dandelion.dmg
+
+      - name: Upload the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Dandelion
+          path: |
+            Dandelion.zip
+            Dandelion.dmg
+
+      - name: Publish a release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists; leaving it as is."; exit 0
+          fi
+          gh release create "$GITHUB_REF_NAME" Dandelion.dmg Dandelion.zip \
+            --repo "$GITHUB_REPOSITORY" --title "Dandelion ${GITHUB_REF_NAME#v}" \
+            --notes "Open the .dmg and drag Dandelion to Applications. First launch: see the README for getting past Gatekeeper."
