@@ -2,7 +2,7 @@
 
 A free and open-source disk space visualizer for macOS, in the spirit of DaisyDisk.
 
-**[Download Dandelion.dmg](https://github.com/cwxyz-tech/dandelion/releases/latest/download/Dandelion.dmg)** · [Project page](https://cwxyz-tech.github.io/dandelion/) · macOS 14 or later · Apple silicon and Intel
+**[Download Dandelion.dmg](https://github.com/cwxyz-tech/dandelion/releases/latest/download/Dandelion.dmg)** · [Project page](https://coleswebsite.xyz/dandelion/) · macOS 14 or later · Apple silicon and Intel
 
 Scan a disk or folder, see everything as an interactive sunburst, find what's eating your space, and clear it out.
 
