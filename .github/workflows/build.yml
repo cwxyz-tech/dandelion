@@ -47,6 +47,20 @@ jobs:
           if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release $GITHUB_REF_NAME already exists; leaving it as is."; exit 0
           fi
+          {
+            echo "Free and open-source disk space visualizer for Mac. macOS 14 or later, Apple silicon and Intel."
+            echo ""
+            echo "**Install:** open \`Dandelion.dmg\` and drag Dandelion onto Applications."
+            echo ""
+            echo "**First launch:** macOS says it can't check the app because it isn't notarized. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**."
+            echo ""
+            echo "**See everything:** turn on Dandelion in **System Settings → Privacy & Security → Full Disk Access**, then rescan."
+            echo ""
+            echo "SHA-256:"
+            echo '```'
+            shasum -a 256 Dandelion.dmg Dandelion.zip
+            echo '```'
+          } > notes.md
           gh release create "$GITHUB_REF_NAME" Dandelion.dmg Dandelion.zip \
             --repo "$GITHUB_REPOSITORY" --title "Dandelion ${GITHUB_REF_NAME#v}" \
-            --notes "Open the .dmg and drag Dandelion to Applications. First launch: see the README for getting past Gatekeeper."
+            --notes-file notes.md
