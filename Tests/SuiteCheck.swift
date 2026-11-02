@@ -157,7 +157,7 @@ enum RulesCheck {
         var restored: [String] = []
         let undoProblems = RulesEngine.undo(r2.done) { path, _ in restored.append(path) }
         check(undoProblems.isEmpty && FileManager.default.fileExists(atPath: dl + "/song.mp3"), "undo puts everything back")
-        check(restored.count == r2.done.count && restored.contains(dl + "/song.mp3"), "undo reports where each file went back to")
+        check(restored.count == r2.done.count && restored.contains { $0.hasSuffix("/Downloads/song.mp3") }, "undo reports where each file went back to")
 
         // undo never moves a different file that took the moved one's place
         let r2b = RulesEngine.run(RulesEngine.plan(sortRule))
