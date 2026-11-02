@@ -5,6 +5,7 @@
 // Command Line Tools don't ship the plugin that expands it.
 
 import AppKit
+import Darwin
 import AVFoundation
 import ScreenCaptureKit
 import SwiftUI
@@ -59,6 +60,8 @@ final class RecorderModel: ObservableObject {
     @Published var pickedWindow: CGWindowID?
     @Published var elapsed: Double = 0
     @Published var starting = false
+    /// True while a stopped recording is being finished and saved.
+    @Published var saving = false
     @Published var recordings: [RecordingItem] = []
     @Published var current: RecordingItem?
     @Published var style = ExportStyle() { didSet { schedulePreview() } }
@@ -92,17 +95,30 @@ final class RecorderModel: ObservableObject {
         mic = UserDefaults.standard.bool(forKey: "recorderMic")
     }
 
+    /// Raw recordings can show anything that was on screen, so their folder is readable only by you.
+    static func makeLibrary() throws {
+        try FileManager.default.createDirectory(at: library, withIntermediateDirectories: true)
+        chmod(library.path, 0o700)
+    }
+
     func start() {
         Hotkeys.shared.register(.record) { [weak self] in
             MainActor.assumeIsolated { self?.toggle() }
         }
+        // the library (with every recording's cursor trail) is only read when the Recorder is opened
+    }
+
+    private var libraryLoaded = false
+    func loadLibraryIfNeeded() {
+        guard !libraryLoaded else { return }
+        libraryLoaded = true
         loadLibrary()
     }
 
     var isRecording: Bool { phase == .recording }
 
     func toggle() {
-        if phase == .recording { stop() } else if !starting { begin() }
+        if phase == .recording { stop() } else if !starting && !saving { begin(fromShortcut: true) }
     }
 
     // MARK: choosing a window
@@ -129,10 +145,13 @@ final class RecorderModel: ObservableObject {
 
     // MARK: recording
 
-    func begin() {
-        guard phase != .recording, !starting else { return }
+    func begin(fromShortcut: Bool = false) {
+        guard phase != .recording, !starting, !saving else { return }
+        // a shortcut can't record a window nobody picked yet; record the screen instead
+        if fromShortcut && source == .window && pickedWindow == nil { source = .screen }
         if !CGPreflightScreenCaptureAccess() {
             CGRequestScreenCaptureAccess()
+            if fromShortcut { app?.bringToFront(tool: .recorder) }
             app?.alertMessage = "Dandelion needs permission to record the screen. Turn it on in System Settings → Privacy & Security → Screen & System Audio Recording, then try again. (macOS asks again after each update, because downloaded builds aren't notarized.)"
             return
         }
@@ -208,7 +227,7 @@ final class RecorderModel: ObservableObject {
         let longest = max(pixels.width, pixels.height)
         if longest > 3840 { pixels = CGSize(width: pixels.width * 3840 / longest, height: pixels.height * 3840 / longest) }
 
-        try FileManager.default.createDirectory(at: Self.library, withIntermediateDirectories: true)
+        try Self.makeLibrary()
         let raw = Self.library.appendingPathComponent("Recording \(ScreenshotModel.stamp()).mov")
         let session = CaptureSession(url: raw, filter: filter, sourceRect: sourceRect, pixelSize: pixels, mic: useMic)
         let tracker = PointerTracker(region: region)
@@ -222,7 +241,7 @@ final class RecorderModel: ObservableObject {
                 self.stop()
             }
         }
-        if source != .area { NSApp.hide(nil) }
+        NSApp.hide(nil)   // also after picking an area, since showing the picker brings Dandelion back
         try? await Task.sleep(nanoseconds: 300_000_000)
         tracker.start()
         try await session.start()
@@ -245,9 +264,12 @@ final class RecorderModel: ObservableObject {
         clock?.invalidate()
         clock = nil
         phase = .setup
+        saving = true
         Task { @MainActor in
             let length = await session.stop()
+            saving = false
             cleanUpAfterStop()
+            chmod(session.url.path, 0o600)
             app?.bringToFront(tool: .recorder)
             guard length > 0.3 else {
                 try? FileManager.default.removeItem(at: session.url)
@@ -258,6 +280,8 @@ final class RecorderModel: ObservableObject {
                                      cursor: tracker.samples, clicks: tracker.clicks, hasAudio: session.hasAudio, created: Date())
             let item = RecordingItem(raw: session.url, info: info)
             save(item)
+            loadLibraryIfNeeded()
+            recordings.removeAll { $0 == item }
             recordings.insert(item, at: 0)
             edit(item)
         }
@@ -275,7 +299,10 @@ final class RecorderModel: ObservableObject {
     private func save(_ item: RecordingItem) {
         let enc = JSONEncoder()
         enc.dateEncodingStrategy = .secondsSince1970
-        if let data = try? enc.encode(item.info) { try? data.write(to: item.infoURL, options: .atomic) }
+        if let data = try? enc.encode(item.info) {
+            try? data.write(to: item.infoURL, options: .atomic)
+            chmod(item.infoURL.path, 0o600)
+        }
     }
 
     func loadLibrary() {
@@ -291,8 +318,9 @@ final class RecorderModel: ObservableObject {
     }
 
     func delete(_ item: RecordingItem) {
+        // both go to the Trash together, so putting the recording back brings its cursor trail too
         try? FileManager.default.trashItem(at: item.raw, resultingItemURL: nil)
-        try? FileManager.default.removeItem(at: item.infoURL)
+        try? FileManager.default.trashItem(at: item.infoURL, resultingItemURL: nil)
         recordings.removeAll { $0 == item }
         if current == item { current = nil; phase = .setup }
     }
@@ -400,7 +428,7 @@ struct RecSetupView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(Tool.recorder.tint)
                     .controlSize(.large)
-                    .disabled(model.starting || (model.source == .window && model.pickedWindow == nil))
+                    .disabled(model.starting || model.saving || (model.source == .window && model.pickedWindow == nil))
                     Text("Stop with ⌥⇧6 or the menu bar. Shortcut ⌥⇧6 also starts a recording from any app.")
                         .font(.system(size: 11)).foregroundStyle(.secondary)
                 }
@@ -410,6 +438,7 @@ struct RecSetupView: View {
             .frame(maxWidth: 980, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
+        .onAppear { model.loadLibraryIfNeeded() }
     }
 
     private func sourceButton(_ s: RecorderModel.Source) -> some View {

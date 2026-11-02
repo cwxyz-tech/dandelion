@@ -320,7 +320,9 @@ enum RecordingExporter {
                 guard let target = outBuffer else { box.failed = true; continue }
                 ctx.render(frame, to: target, bounds: composer.canvas, colorSpace: space)
                 if !adaptor.append(target, withPresentationTime: pts) { box.failed = true }
-                progress(min(1, t / duration))
+                // report whole percents only, instead of once per frame
+                let percent = Int(min(1, t / duration) * 100)
+                if percent > box.reported { box.reported = percent; progress(Double(percent) / 100) }
             }
         }
         if let aIn, let aOut {
@@ -371,6 +373,8 @@ enum RecordingExporter {
 private final class ExportState: @unchecked Sendable {
     private let lock = NSLock()
     private var _failed = false
+    /// Last whole percent reported (only touched on the video queue).
+    var reported = -1
     var failed: Bool {
         get { lock.lock(); defer { lock.unlock() }; return _failed }
         set { lock.lock(); _failed = newValue; lock.unlock() }

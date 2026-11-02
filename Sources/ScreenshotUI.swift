@@ -102,18 +102,38 @@ struct ScreenshotView: View {
     }
 }
 
+/// Loads one thumbnail in the background, so a folder full of big screenshots never stalls the window.
+@MainActor
+final class ThumbLoader: ObservableObject {
+    @Published var image: NSImage?
+    private var loaded: URL?
+
+    func load(_ url: URL) {
+        guard loaded != url else { return }
+        loaded = url
+        image = ScreenshotModel.cachedThumbnail(url)
+        guard image == nil else { return }
+        Task { @MainActor in
+            let img = await ScreenshotModel.loadThumbnail(url)
+            if self.loaded == url { withAnimation(.easeOut(duration: 0.15)) { self.image = img } }
+        }
+    }
+}
+
 struct ShotThumb: View {
     @EnvironmentObject var model: ScreenshotModel
+    @StateObject private var loader = ThumbLoader()
     let url: URL
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ZStack {
                 Color.primary.opacity(0.06)
-                if let img = ScreenshotModel.thumbnail(url, maxPixels: 520) {
+                if let img = loader.image {
                     Image(nsImage: img).resizable().aspectRatio(contentMode: .fit)
                 }
             }
+            .onAppear { loader.load(url) }
             .frame(height: 120)
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.primary.opacity(0.08)))

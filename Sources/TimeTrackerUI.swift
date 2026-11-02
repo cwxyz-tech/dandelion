@@ -34,6 +34,11 @@ final class TimeTrackerModel: ObservableObject {
     private var observers: [NSObjectProtocol] = []
     private var tick: Timer?
     private var asleep = false
+    private var ticks = 0
+    /// Whether the Time Tracker screen is showing (only then do the charts need refreshing).
+    var visible = false
+    /// Category per app, worked out once (reading an app's Info.plist on every switch would be wasteful).
+    private var categories: [String: TimeCategory] = [:]
 
     /// Away from the keyboard and mouse this long counts as a break, not time in the app.
     static let idleAfter: TimeInterval = 5 * 60
@@ -88,11 +93,18 @@ final class TimeTrackerModel: ObservableObject {
         guard tracking, !asleep, !idle, let running else { return }
         let id = running.bundleIdentifier ?? running.localizedName ?? "unknown"
         let name = running.localizedName ?? id
-        var declared: String?
-        if let url = running.bundleURL, let info = Bundle(url: url)?.infoDictionary {
-            declared = info["LSApplicationCategoryType"] as? String
+        let category: TimeCategory
+        if let known = categories[id] {
+            category = known
+        } else {
+            var declared: String?
+            if let url = running.bundleURL, let info = Bundle(url: url)?.infoDictionary {
+                declared = info["LSApplicationCategoryType"] as? String
+            }
+            category = TimeCategory.of(bundleID: id, declared: declared)
+            categories[id] = category
         }
-        recorder.switchTo(app: id, name: name, category: TimeCategory.of(bundleID: id, declared: declared), at: Date())
+        recorder.switchTo(app: id, name: name, category: category, at: Date())
     }
 
     private func pauseNow(at date: Date) {
@@ -113,6 +125,12 @@ final class TimeTrackerModel: ObservableObject {
         if idle {
             idle = false
             frontmostChanged(NSWorkspace.shared.frontmostApplication)
+            return
+        }
+        // save every 2 minutes (a crash loses at most that), not on every tick
+        ticks += 1
+        guard ticks % 4 == 0 else {
+            if visible { reload() }   // keep the numbers live while you're looking at them
             return
         }
         recorder.flush(at: Date())
@@ -229,11 +247,18 @@ final class TimeTrackerModel: ObservableObject {
         }
     }
 
+    private static let icons = NSCache<NSString, NSImage>()
+
     static func icon(for bundleID: String) -> NSImage {
+        if let hit = icons.object(forKey: bundleID as NSString) { return hit }
+        let img: NSImage
         if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
-            return NSWorkspace.shared.icon(forFile: url.path)
+            img = NSWorkspace.shared.icon(forFile: url.path)
+        } else {
+            img = NSWorkspace.shared.icon(for: .applicationBundle)
         }
-        return NSWorkspace.shared.icon(for: .applicationBundle)
+        icons.setObject(img, forKey: bundleID as NSString)
+        return img
     }
 }
 
@@ -258,7 +283,8 @@ struct TimeTrackerView: View {
             .frame(maxWidth: 980, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
-        .onAppear { model.reload() }
+        .onAppear { model.visible = true; model.reload() }
+        .onDisappear { model.visible = false }
         .alert("Delete this \(model.range == .day ? "day's" : "week's") history?", isPresented: Binding(
             get: { model.confirmDelete }, set: { model.confirmDelete = $0 })
         ) {
@@ -402,12 +428,16 @@ struct TimeTrackerView: View {
         return "\(hour)\(h < 12 ? "a" : "p")"
     }
 
+    private static let dayFormat: DateFormatter = {
+        let f = DateFormatter()
+        f.setLocalizedDateFormatFromTemplate("EEE d")
+        return f
+    }()
+
     private func dayLabel(_ i: Int) -> String {
         let d = model.days
         guard i >= 0 && i < d.count else { return "" }
-        let f = DateFormatter()
-        f.dateFormat = "EEE d"
-        return f.string(from: d[i])
+        return Self.dayFormat.string(from: d[i])
     }
 
     private var appsCard: some View {

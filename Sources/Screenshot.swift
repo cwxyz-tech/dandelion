@@ -4,6 +4,7 @@
 // MIT License. See LICENSE.
 
 import AppKit
+import Darwin
 import CoreImage
 import ImageIO
 import SwiftUI
@@ -78,6 +79,7 @@ final class ScreenshotModel: ObservableObject {
         guard !capturing else { return }
         if !CGPreflightScreenCaptureAccess() {
             CGRequestScreenCaptureAccess()
+            if fromShortcut { app?.bringToFront(tool: .screenshot) }
             app?.alertMessage = "Dandelion needs permission to capture the screen. Turn it on in System Settings → Privacy & Security → Screen & System Audio Recording, then try again. (macOS asks again after each update, because downloaded builds aren't notarized.)"
             return
         }
@@ -130,7 +132,7 @@ final class ScreenshotModel: ObservableObject {
         let fm = FileManager.default
         guard fm.fileExists(atPath: tmp.path) else { return }
         do {
-            try fm.createDirectory(at: Self.folder, withIntermediateDirectories: true)
+            try Self.makeFolder()
             let dest = uniqueURL(Self.folder.appendingPathComponent("Screenshot \(Self.stamp()).png"))
             try fm.moveItem(at: tmp, to: dest)
             refresh()
@@ -138,6 +140,12 @@ final class ScreenshotModel: ObservableObject {
         } catch {
             app?.alertMessage = "The screenshot couldn't be saved: \(error.localizedDescription)"
         }
+    }
+
+    /// The screenshots folder, readable only by you (screenshots often show private things).
+    static func makeFolder() throws {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        chmod(folder.path, 0o700)
     }
 
     static func stamp(_ date: Date = Date()) -> String {
@@ -164,14 +172,19 @@ final class ScreenshotModel: ObservableObject {
         recent = dated.sorted { $0.1 > $1.1 }.prefix(48).map { $0.0 }
     }
 
-    func openEditor(_ url: URL) {
+    @discardableResult
+    func openEditor(_ url: URL) -> ShotEditor? {
         guard let editor = ShotEditor(url: url, model: self) else {
             app?.alertMessage = "That screenshot couldn't be opened."
-            return
+            return nil
         }
         let host = NSHostingController(rootView: ShotEditorView(editor: editor))
         let size = editor.fittingWindowSize()
-        editor.window = ExtraWindows.show(host, title: url.deletingPathExtension().lastPathComponent, size: size)
+        editor.window = ExtraWindows.show(host, title: url.deletingPathExtension().lastPathComponent, size: size) {
+            // markup is kept when the window closes, like Preview
+            if !editor.saved { editor.save() }
+        }
+        return editor
     }
 
     func copy(_ url: URL) {
@@ -192,7 +205,7 @@ final class ScreenshotModel: ObservableObject {
     }
 
     func openFolder() {
-        try? FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
+        try? Self.makeFolder()
         NSWorkspace.shared.open(Self.folder)
     }
 
@@ -205,8 +218,31 @@ final class ScreenshotModel: ObservableObject {
         }
     }
 
+    private static let thumbs: NSCache<NSString, NSImage> = {
+        let c = NSCache<NSString, NSImage>()
+        c.countLimit = 120
+        return c
+    }()
+
+    /// A thumbnail from the cache, or nil if it hasn't been made yet (or the file changed).
+    static func cachedThumbnail(_ url: URL) -> NSImage? { thumbs.object(forKey: thumbKey(url)) }
+
+    private static func thumbKey(_ url: URL) -> NSString {
+        let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)?.timeIntervalSince1970 ?? 0
+        return "\(url.path)|\(date)" as NSString
+    }
+
+    /// Makes (and caches) a small thumbnail off the main thread.
+    static func loadThumbnail(_ url: URL) async -> NSImage? {
+        if let hit = cachedThumbnail(url) { return hit }
+        let key = thumbKey(url)
+        let img = await Task.detached(priority: .utility) { thumbnail(url, maxPixels: 480) }.value
+        if let img { thumbs.setObject(img, forKey: key) }
+        return img
+    }
+
     /// A small, fast thumbnail (never decodes the whole image).
-    static func thumbnail(_ url: URL, maxPixels: Int = 480) -> NSImage? {
+    nonisolated static func thumbnail(_ url: URL, maxPixels: Int = 480) -> NSImage? {
         guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         let opts: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true,
                                      kCGImageSourceThumbnailMaxPixelSize: maxPixels,

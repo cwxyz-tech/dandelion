@@ -34,17 +34,35 @@ jobs:
           mkdir -p logs
           sh build.sh 2>&1 | tee logs/build.log
 
-      # When something fails, the logs also go to a "ci-logs" branch, so they can be read with plain git
-      - name: Keep the logs on a branch
-        if: failure() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        env:
-          GH_TOKEN: ${{ github.token }}
+      # Security checks: fail the build if any of these promises breaks
+      - name: Security checks
         run: |
-          cd logs || exit 0
-          git init --quiet -b ci-logs .
-          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" add .
-          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit --quiet -m "Logs from $GITHUB_SHA"
-          git push --quiet --force "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git" ci-logs
+          set -o pipefail
+          mkdir -p logs
+          {
+            APP=build/Dandelion.app
+            BIN="$APP/Contents/MacOS/Dandelion"
+            echo "== hardened runtime"
+            codesign -dv "$APP" 2>&1 | grep -E "flags=0x[0-9a-f]+\(.*runtime.*\)" || { echo "FAIL: hardened runtime is off"; exit 1; }
+            echo "== entitlements (only the microphone is allowed)"
+            codesign -d --entitlements - --xml "$APP" > ent.plist 2>/dev/null || true
+            plutil -convert json -o ent.json ent.plist
+            cat ent.json; echo
+            python3 -c 'import json,sys; k=sorted(json.load(open("ent.json")).keys()); sys.exit(0 if k==["com.apple.security.device.audio-input"] else "FAIL: unexpected entitlements %s" % k)'
+            echo "== no networking frameworks linked"
+            otool -L "$BIN" | tee linked.txt
+            if grep -E "Network.framework|WebKit.framework|CFNetwork.framework" linked.txt; then echo "FAIL: a network framework is linked"; exit 1; fi
+            echo "== no networking code in the source"
+            if grep -rnE "URLSession|URLRequest|NWConnection|NWListener|NSURLConnection|CFSocket|WKWebView|socket\(|getaddrinfo" Sources; then
+              echo "FAIL: networking code found"; exit 1
+            fi
+            echo "== no shell, no downloads: the only program it ever runs is Apple's screencapture"
+            grep -rn "executableURL" Sources | tee exec.txt
+            if grep -v '"/usr/sbin/screencapture"' exec.txt; then echo "FAIL: runs another program"; exit 1; fi
+            echo "== screenshot mode is locked behind an environment variable"
+            grep -q 'DANDELION_README_SHOTS' Sources/ReadmeShots.swift || { echo "FAIL: snapshot mode isn't gated"; exit 1; }
+            echo "All security checks passed."
+          } 2>&1 | tee logs/security.log
 
       - name: Zip and disk image
         run: |
@@ -57,13 +75,37 @@ jobs:
         run: |
           mkdir -p shots
           APP=build/Dandelion.app/Contents/MacOS/Dandelion
+          export DANDELION_README_SHOTS=1
           defaults write xyz.coleswebsite.dandelion rulesAutoRun -bool false
           perl -e "alarm 240; exec @ARGV" "$APP" --snapshot shots/screenshot-light.png --scan /Applications
           perl -e "alarm 240; exec @ARGV" "$APP" --snapshot shots/screenshot-dark.png --scan /Applications --dark
-          for t in screenshot timeTracker recorder; do
-            perl -e "alarm 60; exec @ARGV" "$APP" --snapshot "shots/tool-$t.png" --tool "$t" || true
+          for t in duplicates rules screenshot timeTracker recorder; do
+            perl -e "alarm 60; exec @ARGV" "$APP" --snapshot "shots/tool-$t.png" --tool "$t" || echo "FAIL: $t"
           done
+          perl -e "alarm 240; exec @ARGV" "$APP" --snapshot shots/editor.png --editor || echo "FAIL: editor"
+          perl -e "alarm 240; exec @ARGV" "$APP" --snapshot shots/export-preview.png --export-preview || echo "FAIL: export preview"
           ls -la shots
+
+      # How lean it is: memory and CPU at rest, and the most memory used while scanning a big folder
+      - name: Resource use
+        continue-on-error: true
+        run: |
+          mkdir -p logs
+          APP=build/Dandelion.app/Contents/MacOS/Dandelion
+          {
+            echo "== at rest (window open, nothing running), sampled after it settles"
+            "$APP" & PID=$!
+            sleep 12
+            for i in 1 2 3 4 5 6; do ps -o rss=,%cpu= -p $PID | awk '{printf "memory %.1f MB, cpu %s%%\n", $1/1024, $2}'; sleep 2; done
+            top -l 2 -s 5 -pid $PID -stats pid,cpu,mem,threads,idlew | tail -2
+            kill $PID; wait $PID 2>/dev/null
+            echo "== scanning /Applications (peak memory, total CPU time)"
+            DANDELION_README_SHOTS=1 /usr/bin/time -l "$APP" --snapshot /tmp/scan.png --scan /Applications 2>&1 \
+              | grep -E "maximum resident set size|real|user|sys" | head -4
+            echo "== app size"
+            du -sh build/Dandelion.app
+          } 2>&1 | tee logs/resources.log
+
 
       # Also kept on a "screenshots" branch, so they can be fetched with plain git
       - name: Keep the screenshots on a branch
@@ -86,6 +128,18 @@ jobs:
           name: screenshots
           path: shots/
           if-no-files-found: ignore
+
+      # The logs (checks, build, security, resources) also go to a "ci-logs" branch, so they can be read with plain git
+      - name: Keep the logs on a branch
+        if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd logs || exit 0
+          git init --quiet -b ci-logs .
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" add .
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit --quiet -m "Logs from $GITHUB_SHA"
+          git push --quiet --force "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git" ci-logs
 
       - name: Upload the build
         uses: actions/upload-artifact@v4

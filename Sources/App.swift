@@ -94,10 +94,8 @@ struct MenuBarMenu: View {
         }
         Section("Screen Recorder") {
             if !recorder.isRecording {
-                Button("Record Screen   ⌥⇧6") {
-                    if recorder.source == .window && recorder.pickedWindow == nil { recorder.source = .screen }
-                    recorder.begin()
-                }
+                Button("Start Recording   ⌥⇧6") { recorder.begin(fromShortcut: true) }
+                    .disabled(recorder.starting || recorder.saving)
             }
         }
         Section("Time Tracker") {

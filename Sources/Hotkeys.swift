@@ -88,7 +88,8 @@ enum ExtraWindows {
     private static var observers: [ObjectIdentifier: NSObjectProtocol] = [:]
 
     @discardableResult
-    static func show(_ controller: NSViewController, title: String, size: NSSize, minSize: NSSize = NSSize(width: 520, height: 380)) -> NSWindow {
+    static func show(_ controller: NSViewController, title: String, size: NSSize, minSize: NSSize = NSSize(width: 520, height: 380),
+                     onClose: (() -> Void)? = nil) -> NSWindow {
         let w = NSWindow(contentRect: NSRect(origin: .zero, size: size),
                          styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                          backing: .buffered, defer: false)
@@ -103,6 +104,7 @@ enum ExtraWindows {
         let key = ObjectIdentifier(w)
         observers[key] = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { _ in
             Task { @MainActor in
+                onClose?()
                 shown.removeAll { $0 === w }
                 if let o = observers.removeValue(forKey: key) { NotificationCenter.default.removeObserver(o) }
             }
