@@ -152,8 +152,12 @@ enum MarkDrawer {
     static func pixelate(_ image: CGImage, rect: CGRect) -> CGImage? {
         let r = CGRect(x: rect.minX, y: CGFloat(image.height) - rect.maxY, width: rect.width, height: rect.height).integral
         guard r.width >= 2, r.height >= 2, let f = CIFilter(name: "CIPixellate") else { return nil }
-        f.setValue(CIImage(cgImage: image).clampedToExtent(), forKey: kCIInputImageKey)
-        f.setValue(max(10, max(r.width, r.height) / 12), forKey: kCIInputScaleKey)
+        let block = max(10, max(r.width, r.height) / 12)
+        // blur first, so each block is the average of its area: pixellating alone keeps one real pixel per block,
+        // which can leave text readable
+        let mixed = CIImage(cgImage: image).clampedToExtent().applyingGaussianBlur(sigma: block * 0.7)
+        f.setValue(mixed, forKey: kCIInputImageKey)
+        f.setValue(block, forKey: kCIInputScaleKey)
         f.setValue(CIVector(x: r.midX, y: r.midY), forKey: kCIInputCenterKey)
         guard let out = f.outputImage?.cropped(to: r) else { return nil }
         return ci.createCGImage(out, from: r)

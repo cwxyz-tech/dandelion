@@ -105,8 +105,9 @@ enum ExportCheck {
 
         // framed, with zoom, cursor and ripples
         let framed = dir.appendingPathComponent("framed.mp4")
-        var style = ExportStyle()
-        style.height = 360
+        var styleSetup = ExportStyle()
+        styleSetup.height = 360
+        let style = styleSetup
         let failure = Box<String?>(nil)
         let lastProgress = Box(0.0)
         wait {
@@ -131,10 +132,11 @@ enum ExportCheck {
 
         // plain: no frame, keeps the recording's shape
         let plain = dir.appendingPathComponent("plain.mp4")
-        var plainStyle = ExportStyle()
-        plainStyle.framed = false
-        plainStyle.zoom = false
-        plainStyle.height = 360
+        var plainSetup = ExportStyle()
+        plainSetup.framed = false
+        plainSetup.zoom = false
+        plainSetup.height = 360
+        let plainStyle = plainSetup
         failure.value = nil
         wait {
             do { try await RecordingExporter.export(raw: raw, info: info, style: plainStyle, to: plain) { _ in } }
