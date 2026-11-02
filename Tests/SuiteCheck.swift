@@ -13,6 +13,8 @@ struct Checks {
         DupCheck.run()
         print("== Folder Rules")
         RulesCheck.run()
+        print("== Tree after trashing")
+        TreeCheck.run()
         let failures = ScanCheck.failures
         print(failures == 0 ? "\nAll checks passed." : "\n\(failures) check(s) failed.")
         exit(failures == 0 ? 0 : 1)
@@ -152,8 +154,31 @@ enum RulesCheck {
         check(FileManager.default.fileExists(atPath: dl + "/Installers/old-installer.dmg"), "installer sorted into Installers")
         check(FileManager.default.fileExists(atPath: dl + "/Screenshots/Screenshot 2026-01-01 at 10.00.00.png"), "screenshot recognized and sorted")
         check(FileManager.default.fileExists(atPath: dl + "/Audio/song.mp3"), "audio sorted into Audio")
-        let undoProblems = RulesEngine.undo(r2.done)
+        var restored: [String] = []
+        let undoProblems = RulesEngine.undo(r2.done) { path, _ in restored.append(path) }
         check(undoProblems.isEmpty && FileManager.default.fileExists(atPath: dl + "/song.mp3"), "undo puts everything back")
+        check(restored.count == r2.done.count && restored.contains(dl + "/song.mp3"), "undo reports where each file went back to")
+
+        // undo never moves a different file that took the moved one's place
+        let r2b = RulesEngine.run(RulesEngine.plan(sortRule))
+        if let song = r2b.done.first(where: { $0.from.hasSuffix("/song.mp3") }) {
+            try? FileManager.default.removeItem(atPath: song.to)
+            write(song.to, bytes: [9, 9, 9])
+            let probs = RulesEngine.undo([song])
+            check(!probs.isEmpty && !FileManager.default.fileExists(atPath: dl + "/song.mp3"), "undo leaves a replaced file alone")
+            try? FileManager.default.removeItem(atPath: song.to)
+        } else { check(false, "song was sorted for the replaced-file undo check") }
+        _ = RulesEngine.undo(r2b.done.filter { !$0.from.hasSuffix("/song.mp3") })
+        file("song.mp3", size: 3_000_000, age: old)
+
+        // "added" really means added: files written moments ago weren't added days ago, even with an old modified date
+        let addedRule = FolderRule(name: "Added", folder: dl, conditions: [RuleCondition(kind: .addedMoreThanDaysAgo, number: 1)],
+                                   action: RuleAction(kind: .moveToTrash))
+        check(RulesEngine.plan(addedRule).isEmpty, "added-date condition uses the date added, not the date modified")
+        // a negative number can't turn a condition into "everything"
+        let negRule = FolderRule(name: "Neg", folder: dl, conditions: [RuleCondition(kind: .smallerThanMB, number: -5)],
+                                 action: RuleAction(kind: .moveToTrash))
+        check(RulesEngine.plan(negRule).isEmpty, "negative sizes match nothing")
 
         // never overwrite
         try? FileManager.default.createDirectory(atPath: base + "/Archive", withIntermediateDirectories: true)
@@ -191,5 +216,25 @@ enum RulesCheck {
         check(RulesEngine.uniquePath(base + "/Archive/notes.txt").hasSuffix("notes 3.txt"), "unique names keep counting up")
 
         try? FileManager.default.removeItem(atPath: base)
+    }
+}
+
+enum TreeCheck {
+    static func run() {
+        // root: big (10), mid (6), small (1). Trash most of big: mid has to come first now.
+        let root = RootNode(path: "/tmp/x", displayName: "x", fileID: 1)
+        let big = Node(name: "big", size: 0, fileID: 2, flags: [.directory])
+        let mid = Node(name: "mid", size: 6, fileID: 3, flags: [])
+        let small = Node(name: "small", size: 1, fileID: 4, flags: [])
+        let a = Node(name: "a", size: 9, fileID: 5, flags: [])
+        let b = Node(name: "b", size: 1, fileID: 6, flags: [])
+        big.add(a); big.add(b); big.finalize()
+        root.add(big); root.add(mid); root.add(small); root.finalize()
+        check(root.children.map { $0.name } == ["big", "mid", "small"], "children start biggest first")
+        a.removeFromTree()
+        check(big.size == 1 && root.size == 8, "totals go down after trashing")
+        check(root.children.map { $0.name } == ["mid", "big", "small"] || root.children.map { $0.name } == ["mid", "small", "big"],
+              "a folder that shrank moves down, so nothing big gets hidden in the small-items slice")
+        check(root.children.first?.name == "mid", "the biggest item is first again")
     }
 }

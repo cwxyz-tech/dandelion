@@ -126,6 +126,13 @@ final class DuplicatesModel: ObservableObject {
 
     var totalReclaimable: Int64 { groups.reduce(0) { $0 + $1.reclaimable } }
 
+    /// Selected files the current filter is hiding (they'd still go to the Trash).
+    var hiddenSelectedCount: Int {
+        guard filter != nil else { return 0 }
+        let shown = Set(visibleGroups.flatMap { $0.files.map { $0.path } })
+        return selected.filter { !shown.contains($0) }.count
+    }
+
     var selectedBytes: Int64 {
         groups.reduce(0) { t, g in t + g.files.filter { selected.contains($0.path) }.reduce(0) { $0 + $1.size } }
     }
@@ -443,7 +450,9 @@ struct DupResultsView: View {
             Button("Move to Trash", role: .destructive) { model.trashSelected() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("That's \(Fmt.bytes(model.selectedBytes)). One copy of every file stays where it is. Each file is checked first to make sure it hasn't changed, and you can put things back from the Trash until you empty it.")
+            let hidden = model.hiddenSelectedCount
+            Text((hidden > 0 ? "\(Fmt.count(hidden)) of them \(hidden == 1 ? "isn't" : "aren't") shown with the current filter. " : "")
+                 + "That's \(Fmt.bytes(model.selectedBytes)). One copy of every file stays where it is. Each file is checked first to make sure it hasn't changed, and you can put things back from the Trash until you empty it.")
         }
     }
 

@@ -29,6 +29,9 @@ final class RulesModel: ObservableObject {
     private var watchers: [String: DispatchSourceFileSystemObject] = [:]
     private var pending: [String: DispatchWorkItem] = [:]
     private var sweep: Timer?
+    /// Files put back with Undo this session (path → file ID). Automatic runs leave them alone,
+    /// otherwise the watcher would notice them coming back and move them straight away again.
+    private var undone: [String: UInt64] = [:]
 
     init() {
         autoRun = UserDefaults.standard.bool(forKey: "rulesAutoRun")
@@ -97,7 +100,8 @@ final class RulesModel: ObservableObject {
     /// Runs every enabled rule (optionally only those watching one folder).
     func runAll(folder: String? = nil, automatic: Bool) {
         let chosen = rules.filter { $0.enabled && RulesEngine.problem(with: $0) == nil && (folder == nil || standard($0.folder) == folder) }
-        let work = chosen.map { ($0, RulesEngine.plan($0)) }.filter { !$0.1.isEmpty }
+        let work = chosen.map { r in (r, RulesEngine.plan(r).filter { !automatic || undone[$0.source] != $0.fileID }) }
+            .filter { !$0.1.isEmpty }
         if work.isEmpty {
             if !automatic { app?.show(Toast(text: "Nothing to do. Your folders are already tidy.", symbol: "checkmark.circle.fill", tint: .green)) }
             return
@@ -142,8 +146,10 @@ final class RulesModel: ObservableObject {
         guard !entries.isEmpty else { return }
         lastRun = []
         Task.detached(priority: .userInitiated) {
-            let problems = RulesEngine.undo(entries)
+            var back: [(String, UInt64)] = []
+            let problems = RulesEngine.undo(entries) { path, id in back.append((path, id)) }
             await MainActor.run {
+                for (path, id) in back { self.undone[path] = id }
                 let undone = Set(entries.map { $0.id })
                 withAnimation(self.reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 0.85)) {
                     self.log.removeAll { undone.contains($0.id) }
@@ -166,26 +172,47 @@ final class RulesModel: ObservableObject {
             src.cancel()
             watchers[folder] = nil
         }
-        for folder in wanted where watchers[folder] == nil {
-            let fd = open(folder, O_EVTONLY | O_CLOEXEC)
-            if fd < 0 { continue }
-            let src = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: [.write, .rename, .delete], queue: .main)
-            // (the model lives as long as the app, so holding on to it here is fine)
-            src.setEventHandler {
-                Task { @MainActor in self.folderChanged(folder) }
-            }
-            src.setCancelHandler { close(fd) }
-            src.resume()
-            watchers[folder] = src
-        }
+        for folder in wanted where watchers[folder] == nil { watch(folder) }
         sweep?.invalidate()
         sweep = nil
         if autoRun {
             sweep = Timer.scheduledTimer(withTimeInterval: 15 * 60, repeats: true) { _ in
-                Task { @MainActor in self.runAll(automatic: true) }
+                Task { @MainActor in self.rearm(); self.runAll(automatic: true) }
             }
             runAll(automatic: true)
         }
+    }
+
+    /// Re-opens watchers for folders that came back (without kicking off another full run).
+    private func rearm() {
+        guard autoRun else { return }
+        let wanted = Set(rules.filter { $0.enabled }.map { standard($0.folder) })
+        for folder in wanted where watchers[folder] == nil { watch(folder) }
+    }
+
+    private func watch(_ folder: String) {
+        let fd = open(folder, O_EVTONLY | O_CLOEXEC)
+        if fd < 0 { return }
+        let src = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: [.write, .rename, .delete], queue: .main)
+        // (the model lives as long as the app, so holding on to it here is fine)
+        src.setEventHandler { [weak src] in
+            let gone = src.map { !$0.data.intersection([.delete, .rename]).isEmpty } ?? false
+            let me = src.map { ObjectIdentifier($0 as AnyObject) }
+            Task { @MainActor in
+                if gone {
+                    // the folder itself was moved or deleted: stop watching the old one, look again shortly
+                    guard let w = self.watchers[folder], ObjectIdentifier(w as AnyObject) == me else { return }
+                    w.cancel()
+                    self.watchers[folder] = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 5) { Task { @MainActor in self.rearm() } }
+                } else {
+                    self.folderChanged(folder)
+                }
+            }
+        }
+        src.setCancelHandler { close(fd) }
+        src.resume()
+        watchers[folder] = src
     }
 
     private func folderChanged(_ folder: String) {

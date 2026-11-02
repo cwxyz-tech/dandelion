@@ -120,6 +120,8 @@ struct RuleLogEntry: Identifiable, Codable, Equatable {
     /// Where it ended up (for the Trash, its spot in the Trash).
     let to: String
     let toTrash: Bool
+    /// The file's ID on disk once moved, so Undo only ever moves that same file back.
+    var fileID: UInt64? = nil
 }
 
 struct RuleRun {
@@ -136,6 +138,7 @@ enum RulesEngine {
         guard rule.enabled, !rule.conditions.isEmpty || rule.action.kind != .moveToTrash else { return [] }
         let folder = (rule.folder as NSString).standardizingPath
         guard let names = try? FileManager.default.contentsOfDirectory(atPath: folder) else { return [] }
+        let needsAdded = rule.action.kind == .sortByMonth || rule.conditions.contains { $0.kind == .addedMoreThanDaysAgo }
         var out: [PlannedMove] = []
         for name in names.sorted() {
             if name.hasPrefix(".") { continue }
@@ -150,8 +153,7 @@ enum RulesEngine {
             guard isFile || isPackage else { continue }   // plain files (and app-style packages) only, never folders or links
             let modified = Date(timeIntervalSince1970: Double(st.st_mtimespec.tv_sec))
             if now.timeIntervalSince(modified) < 10 { continue }   // still being written
-            let url = URL(fileURLWithPath: path)
-            let added = (try? url.resourceValues(forKeys: [.addedToDirectoryDateKey]).addedToDirectoryDate) ?? modified
+            let added = needsAdded ? (addedDate(path) ?? modified) : modified
             let length = Int64(st.st_size)
             let info = FileInfo(name: name, ext: ext, kind: FileKind.of(name: name), added: added, modified: modified, length: length)
             guard matches(rule, info, now: now) else { continue }
@@ -160,6 +162,10 @@ enum RulesEngine {
             out.append(PlannedMove(source: path, destination: dest, fileID: UInt64(st.st_ino), ruleName: rule.name))
         }
         return out
+    }
+
+    private static func addedDate(_ path: String) -> Date? {
+        try? URL(fileURLWithPath: path).resourceValues(forKeys: [.addedToDirectoryDateKey]).addedToDirectoryDate
     }
 
     struct FileInfo {
@@ -183,10 +189,10 @@ enum RulesEngine {
                 let wanted = c.text.lowercased().split(whereSeparator: { $0 == "," || $0 == " " })
                     .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: ". ")) }.filter { !$0.isEmpty }
                 return wanted.contains(f.ext)
-            case .addedMoreThanDaysAgo: return now.timeIntervalSince(f.added) > c.number * 86400
-            case .modifiedMoreThanDaysAgo: return now.timeIntervalSince(f.modified) > c.number * 86400
-            case .largerThanMB: return Double(f.length) > c.number * 1_000_000
-            case .smallerThanMB: return Double(f.length) < c.number * 1_000_000
+            case .addedMoreThanDaysAgo: return now.timeIntervalSince(f.added) > max(0, c.number) * 86400
+            case .modifiedMoreThanDaysAgo: return now.timeIntervalSince(f.modified) > max(0, c.number) * 86400
+            case .largerThanMB: return Double(f.length) > max(0, c.number) * 1_000_000
+            case .smallerThanMB: return Double(f.length) < max(0, c.number) * 1_000_000
             }
         }
         return rule.matchAll ? results.allSatisfy { $0 } : results.contains(true)
@@ -257,7 +263,8 @@ enum RulesEngine {
                     try fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
                     let target = uniquePath(dest)
                     try fm.moveItem(atPath: m.source, toPath: target)
-                    result.done.append(RuleLogEntry(date: now, ruleName: m.ruleName, from: m.source, to: target, toTrash: false))
+                    result.done.append(RuleLogEntry(date: now, ruleName: m.ruleName, from: m.source, to: target, toTrash: false,
+                                                    fileID: m.fileID))
                 } catch {
                     result.problems.append("\((m.source as NSString).lastPathComponent): \(error.localizedDescription)")
                 }
@@ -270,7 +277,7 @@ enum RulesEngine {
                     var out: NSURL?
                     try fm.trashItem(at: URL(fileURLWithPath: m.source), resultingItemURL: &out)
                     result.done.append(RuleLogEntry(date: now, ruleName: m.ruleName, from: m.source,
-                                                    to: (out as URL?)?.path ?? "", toTrash: true))
+                                                    to: (out as URL?)?.path ?? "", toTrash: true, fileID: m.fileID))
                 } catch {
                     result.problems.append("\((m.source as NSString).lastPathComponent): \(error.localizedDescription)")
                 }
@@ -280,17 +287,25 @@ enum RulesEngine {
     }
 
     /// Puts files back where they were (newest first). Returns problems, if any.
-    static func undo(_ entries: [RuleLogEntry]) -> [String] {
+    /// `restored` hears where each file ended up (so automatic runs can leave it alone afterwards).
+    static func undo(_ entries: [RuleLogEntry], restored: ((String, UInt64) -> Void)? = nil) -> [String] {
         var problems: [String] = []
         let fm = FileManager.default
         for e in entries.reversed() where !e.to.isEmpty {
-            guard fm.fileExists(atPath: e.to) else {
+            var st = stat()
+            guard lstat(e.to, &st) == 0 else {
                 problems.append("\((e.from as NSString).lastPathComponent) isn't where it was moved to anymore.")
+                continue
+            }
+            if let id = e.fileID, id != 0, UInt64(st.st_ino) != id {
+                problems.append("\((e.from as NSString).lastPathComponent): a different file is there now, so it was left alone.")
                 continue
             }
             do {
                 try fm.createDirectory(atPath: (e.from as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
-                try fm.moveItem(atPath: e.to, toPath: uniquePath(e.from))
+                let back = uniquePath(e.from)
+                try fm.moveItem(atPath: e.to, toPath: back)
+                restored?(back, UInt64(st.st_ino))
             } catch {
                 problems.append("\((e.from as NSString).lastPathComponent): \(error.localizedDescription)")
             }
