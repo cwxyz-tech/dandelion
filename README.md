@@ -4,7 +4,7 @@
 
 **[Download Dandelion.dmg](https://github.com/cwxyz-tech/dandelion/releases/latest/download/Dandelion.dmg)** · [Project page](https://coleswebsite.xyz/dandelion/) · macOS 14 or later · Apple silicon and Intel
 
-See what's eating your disk, clear out duplicate files, and keep folders tidy on their own. Each tool replaces a paid Mac utility, and nothing ever leaves your Mac.
+See what's eating your disk, clear out duplicate files, keep folders tidy on their own, take and mark up screenshots, see where your day goes, and make polished screen recordings. Each tool replaces a paid Mac utility, and nothing ever leaves your Mac.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.png">
@@ -16,9 +16,9 @@ See what's eating your disk, clear out duplicate files, and keep folders tidy on
 | **Disk Map** | Your disk as an interactive sunburst, so the big forgotten folders jump out | DaisyDisk | Ready |
 | **Duplicates** | Finds identical files and keeps just one of each | Gemini | Ready |
 | **Folder Rules** | "Trash old installers", "sort Downloads by type": folders that tidy themselves | Hazel | Ready |
-| **Screenshot** | Capture, mark up, blur and pin screenshots | CleanShot X | Planned |
-| **Time Tracker** | See which apps your day goes to, kept on your Mac | Timing | Planned |
-| **Screen Recorder** | Recordings that zoom smoothly to your clicks | Screen Studio | Planned |
+| **Screenshot** | Capture, mark up, blur and pin screenshots | CleanShot X | Ready |
+| **Time Tracker** | See which apps your day goes to, kept on your Mac | Timing | Ready |
+| **Screen Recorder** | Recordings that zoom smoothly to your clicks | Screen Studio | Ready |
 
 <img src="icon-1024.png" alt="Dandelion icon" width="160">
 
@@ -77,11 +77,48 @@ xattr -dr com.apple.quarantine /Applications/Dandelion.app
 - Only looks at files sitting directly in the folder, skips anything still downloading, never overwrites (a clash gets "name 2"), refuses system folders, and every run can be undone.
 - Rules are saved in `~/Library/Application Support/Dandelion/rules.json`, readable only by you.
 
+## Screenshot
+
+- **⌥⇧4** an area, **⌥⇧5** a window, **⌥⇧3** the whole screen, from any app (or the buttons in the app). Uses macOS's own `screencapture`, so selecting works exactly like Command-Shift-4.
+- Mark up with arrows, boxes, highlights, text and blur (blur pixelates, so it can't be undone by sharpening).
+- Copy, save, **pin** it so it floats above every window (drag to move, scroll to resize, double-click to close), or drag it straight into another app.
+- Saved in Pictures → Dandelion Screenshots. Optional delay of 3, 5 or 10 seconds.
+- Turn on "keep shortcuts working" and Dandelion stays in the menu bar after you close the window.
+
+<img src="docs/tool-screenshot.png" alt="The Screenshot tool" width="720">
+
+## Time Tracker
+
+- Off until you turn it on. Then it logs which app is in front and for how long: **only app names and times**, never window titles, screenshots or what you type.
+- Breaks of 5 minutes or more, sleep and the lock screen aren't counted.
+- Day and week charts by hour and category, plus your top apps. Categories come from a built-in list and the category each app declares.
+- Each day is a small JSON file in `~/Library/Application Support/Dandelion/Time`, readable only by you. Delete any day or week from the app.
+
+<img src="docs/tool-timeTracker.png" alt="Time Tracker showing a sample day" width="720">
+
+## Screen Recorder
+
+- Record the whole screen, one window, or an area you drag out, with or without your microphone. **⌥⇧6** starts and stops from any app; the menu bar icon turns red while recording.
+- The system cursor is left out of the recording. Dandelion notes where the pointer goes and where you click, and draws its own on export.
+- Export adds a background, padding, rounded corners and a shadow, **zooms smoothly toward each click** (nearby clicks share one zoom), draws a crisp, bigger cursor that glides instead of jitters, and ripples on every click. Preview any moment before exporting.
+- 720p to 4K MP4, saved in Movies → Dandelion Recordings. Raw recordings stay in Application Support until you delete them.
+
+<img src="docs/tool-recorder.png" alt="The Screen Recorder" width="720">
+
+### Permissions
+
+Screenshot and Screen Recorder need **Screen & System Audio Recording** permission, and recording your voice needs the **Microphone**. macOS asks the first time. Downloaded builds aren't notarized, so macOS asks again after each update.
+
+## Menu bar
+
+Anything that runs in the background (automatic Folder Rules, Time Tracker, screenshot shortcuts, a recording) keeps Dandelion in the menu bar after you close its window, with no Dock icon. The menu has every capture, start and stop, the Time Tracker and Folder Rules switches, **Open at Login**, and Quit.
+
 ## In the next update
 
+- Three new tools: **Screenshot**, **Time Tracker** and **Screen Recorder**
+- A menu bar item for everything that runs in the background, and Open at Login
 - Folder Rules keep running from the menu bar after you close the window
 - Apps are their own kind in Folder Rules, so installer rules can't catch them
-- The sidebar only shows tools that are ready
 - Screenshots in the README, taken from the real app on every build
 
 ## What's new in 2.0
@@ -102,7 +139,7 @@ xattr -dr com.apple.quarantine /Applications/Dandelion.app
 ## Security
 
 - No network access at all, no analytics, no accounts.
-- Built with the hardened runtime.
+- Built with the hardened runtime. The only exception it allows is the microphone, for Screen Recorder (and macOS still asks you first).
 - Folders are opened with `O_NOFOLLOW`, so a link swapped in mid-scan is never followed off the disk.
 - Before moving anything to the Trash it checks the file ID and its folder's ID against the scan, and blocks system folders, your home folder's top-level folders, and other users' homes.
 - Everything goes to the Trash; nothing is deleted outright.
@@ -125,11 +162,17 @@ macOS hides some folders (Mail, Messages, Safari, other apps' containers) from e
 | `Sources/Safety.swift` | Checks before anything goes to the Trash |
 | `Sources/Duplicates.swift`, `Sources/DuplicatesUI.swift` | The Duplicate Finder engine and its screens |
 | `Sources/Rules.swift`, `Sources/RulesUI.swift` | The Folder Rules engine, its screens and the folder watcher |
+| `Sources/Screenshot.swift`, `Sources/ScreenshotUI.swift` | Capturing, the markup editor and pinned screenshots |
+| `Sources/TimeLog.swift`, `Sources/TimeTrackerUI.swift` | The Time Tracker engine (segments, storage, stats) and its screens |
+| `Sources/ScreenRecorder.swift` | Recording with ScreenCaptureKit, the pointer tracker and the area picker |
+| `Sources/RecorderMath.swift` | Where the camera zooms and where the cursor is, at any moment |
+| `Sources/RecorderExport.swift`, `Sources/RecorderUI.swift` | Rendering the finished video, and the recorder's screens |
+| `Sources/Hotkeys.swift` | Global keyboard shortcuts |
 | `Sources/Suite.swift` | The sidebar of tools |
 | `Sources/Icons.swift` | Fast, cached file icons |
 | `Sources/App.swift` | App entry point, menus and the menu bar item |
 | `Sources/ReadmeShots.swift` | Takes the README screenshots in CI (only when run with `--snapshot`) |
-| `Tests/ScanCheck.swift`, `Tests/SuiteCheck.swift` | Checks for the scanner, Duplicate Finder and Folder Rules on tricky test folders (run in CI: `sh Tests/run.sh`) |
+| `Tests/ScanCheck.swift`, `Tests/SuiteCheck.swift`, `Tests/ToolsCheck.swift` | Checks for the scanner, Duplicate Finder, Folder Rules, Time Tracker and the zoom math (run in CI: `sh Tests/run.sh`) |
 | `docs/` | The project page (GitHub Pages) |
 
 On the startup disk, Dandelion scans the Data volume (`/System/Volumes/Data`), which is where all your files live. Other mounted disks aren't counted, even if they're mounted inside the folder being scanned.

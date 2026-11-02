@@ -65,8 +65,10 @@ final class FrameComposer {
         let aspect = sourceSize.width / max(sourceSize.height, 1)
         let W: Double = style.framed ? H * 16 / 9 : H * aspect
         let even = { (v: Double) in max(2, (v / 2).rounded(.down) * 2) }
-        canvas = CGRect(x: 0, y: 0, width: even(W), height: even(H))
+        let canvas = CGRect(x: 0, y: 0, width: even(W), height: even(H))
+        self.canvas = canvas
 
+        let content: CGRect
         if style.framed {
             let pad = canvas.height * style.padding
             let box = canvas.insetBy(dx: pad, dy: pad)
@@ -77,6 +79,7 @@ final class FrameComposer {
         } else {
             content = canvas
         }
+        self.content = content
         spans = style.zoom ? ZoomPlanner.plan(clicks: info.clicks, duration: info.duration) : []
 
         // background with the shadow already in it

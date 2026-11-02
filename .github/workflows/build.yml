@@ -106,7 +106,7 @@ jobs:
             echo "Release $TAG already exists; nothing to publish."; exit 0
           fi
           {
-            echo "**Make a wish. Clear your Mac.** A free, open-source toolkit for the everyday mess on your Mac: **Disk Map** (see what's eating your disk), **Duplicates** (clear out identical files) and **Folder Rules** (folders that tidy themselves). macOS 14 or later, Apple silicon and Intel. No network access, no analytics, no accounts."
+            echo "**Make a wish. Clear your Mac.** A free, open-source toolkit for the everyday mess on your Mac: **Disk Map** (see what's eating your disk), **Duplicates** (clear out identical files), **Folder Rules** (folders that tidy themselves), **Screenshot** (capture, mark up, pin), **Time Tracker** (where your day goes, kept on your Mac) and **Screen Recorder** (recordings that zoom to your clicks). macOS 14 or later, Apple silicon and Intel. No network access, no analytics, no accounts."
             echo ""
             echo "**Install:** open \`Dandelion.dmg\` and drag Dandelion onto Applications."
             echo ""

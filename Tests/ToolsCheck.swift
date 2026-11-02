@@ -42,7 +42,9 @@ enum TimeCheck {
         let more = TimeSegment(app: "com.apple.Mail", name: "Mail", category: .communication, start: at(55), end: at(70))
         try? TimeStore.append([more], to: folder)
         let loaded = TimeStore.load(day: "2026-03-10", from: folder)
-        check(loaded.count == 3 && abs((loaded.last?.seconds ?? 0) - 15 * 60 - 15 * 60 + 1) < 2,
+        let joined: TimeInterval = loaded.last?.seconds ?? 0
+        let expected: TimeInterval = 30 * 60 - 1   // Mail from 9:40:01 to 10:10
+        check(loaded.count == 3 && abs(joined - expected) < 2,
               "saved days load back, and a segment that continues the last one is joined onto it (\(loaded.count))")
         var st = stat()
         check(stat(TimeStore.url(day: "2026-03-10", in: folder).path, &st) == 0 && (st.st_mode & 0o777) == 0o600, "time files are private to you")

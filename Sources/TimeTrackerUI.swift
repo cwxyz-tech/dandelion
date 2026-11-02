@@ -356,15 +356,15 @@ struct TimeTrackerView: View {
             Group {
                 if model.range == .day {
                     Chart(TimeStats.byHour(model.segments, day: model.anchor)) { slot in
-                        BarMark(x: .value("Hour", slot.index), y: .value("Minutes", slot.seconds / 60), width: .ratio(0.75))
+                        BarMark(x: .value("Hour", Double(slot.index)), y: .value("Minutes", slot.seconds / 60), width: .ratio(0.75))
                             .foregroundStyle(by: .value("Category", slot.category.rawValue))
                             .cornerRadius(3)
                     }
                     .chartXScale(domain: -0.5...23.5)
                     .chartXAxis {
-                        AxisMarks(values: [0, 3, 6, 9, 12, 15, 18, 21]) { v in
+                        AxisMarks(values: [0.0, 3, 6, 9, 12, 15, 18, 21]) { v in
                             AxisGridLine()
-                            AxisValueLabel { if let h = v.as(Int.self) { Text(hourLabel(h)) } }
+                            AxisValueLabel { if let h = v.as(Double.self) { Text(hourLabel(Int(h))) } }
                         }
                     }
                     .chartYAxisLabel("minutes")

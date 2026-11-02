@@ -84,7 +84,7 @@ final class Hotkeys {
 /// Windows Dandelion opens besides the main one (screenshot editors). Kept alive until they're closed.
 @MainActor
 enum ExtraWindows {
-    private static var open: [NSWindow] = []
+    private static var shown: [NSWindow] = []
     private static var observers: [ObjectIdentifier: NSObjectProtocol] = [:]
 
     @discardableResult
@@ -99,11 +99,11 @@ enum ExtraWindows {
         w.titlebarAppearsTransparent = true
         w.isReleasedWhenClosed = false
         w.center()
-        open.append(w)
+        shown.append(w)
         let key = ObjectIdentifier(w)
         observers[key] = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { _ in
             Task { @MainActor in
-                open.removeAll { $0 === w }
+                shown.removeAll { $0 === w }
                 if let o = observers.removeValue(forKey: key) { NotificationCenter.default.removeObserver(o) }
             }
         }
