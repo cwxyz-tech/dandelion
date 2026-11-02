@@ -1,5 +1,12 @@
 // Dandelion - the disk scanner.
-// Walks the disk with fts (the same fast C walker `du` uses), split into many parallel jobs.
+//
+// Each folder is read with getattrlistbulk(2): one system call returns the names, types, IDs and
+// on-disk sizes of a whole batch of entries, instead of one stat() per file. That's the fast path macOS
+// itself uses. If a disk doesn't support it, that folder is read the classic way (readdir + fstatat).
+//
+// The work is split into many folders up front and spread across every CPU core.
+// Folders are opened with O_NOFOLLOW, so a link swapped in mid-scan is never followed out of the disk.
+//
 // MIT License. See LICENSE.
 
 import Darwin
@@ -46,52 +53,150 @@ final class ScanProgress: @unchecked Sendable {
 }
 
 /// Hard-linked files are only counted once (Time Machine and Xcode use lots of them).
-private final class InodeSet: @unchecked Sendable {
-    private let lock = NSLock()
-    private var seen = Set<UInt64>()
+/// Split into shards so parallel workers rarely wait on each other.
+final class InodeSet: @unchecked Sendable {
+    private let shards = 32
+    private let locks: [NSLock]
+    private var sets: [Set<UInt64>]
 
-    /// True the first time an inode is seen.
-    func insert(_ ino: UInt64) -> Bool {
-        lock.lock(); defer { lock.unlock() }
-        return seen.insert(ino).inserted
+    init() {
+        locks = (0..<32).map { _ in NSLock() }
+        sets = Array(repeating: Set<UInt64>(), count: 32)
+    }
+
+    /// True the first time an ID is seen.
+    func insert(_ id: UInt64) -> Bool {
+        let i = Int(truncatingIfNeeded: (id ^ (id >> 17)) % UInt64(shards))
+        locks[i].lock(); defer { locks[i].unlock() }
+        return sets[i].insert(id).inserted
     }
 }
 
 enum Scanner {
+    /// One directory entry, as read from disk.
+    struct Entry {
+        var name: String
+        var isDir: Bool
+        var isMountPoint: Bool
+        var dev: dev_t
+        var fileID: UInt64
+        var links: UInt32
+        var size: Int64
+    }
+
     private struct Job {
-        let parent: Node
+        let node: Node
         let path: String
     }
 
+    private final class Context: @unchecked Sendable {
+        let dev: dev_t
+        let progress: ScanProgress
+        let seen: InodeSet
+        private let lock = NSLock()
+        private var jobs: [Job]
+        private var next = 0
+
+        init(dev: dev_t, progress: ScanProgress, seen: InodeSet, jobs: [Job]) {
+            self.dev = dev
+            self.progress = progress
+            self.seen = seen
+            self.jobs = jobs
+        }
+
+        func take() -> Job? {
+            lock.lock(); defer { lock.unlock() }
+            guard next < jobs.count else { return nil }
+            next += 1
+            return jobs[next - 1]
+        }
+    }
+
+    // attribute bits (sys/attr.h), spelled out so their types are exact
+    private enum A {
+        static let cmnName: UInt32 = 0x0000_0001
+        static let cmnDevID: UInt32 = 0x0000_0002
+        static let cmnObjType: UInt32 = 0x0000_0008
+        static let cmnFileID: UInt32 = 0x0200_0000
+        static let cmnReturnedAttrs: UInt32 = 0x8000_0000
+        static let dirMountStatus: UInt32 = 0x0000_0004
+        static let fileLinkCount: UInt32 = 0x0000_0001
+        static let fileAllocSize: UInt32 = 0x0000_0004
+        static let typeDirectory: UInt32 = 2   // VDIR
+        static let mountPointFlag: UInt32 = 0x1 // DIR_MNTSTATUS_MNTPOINT
+    }
+
+    private static let bufferSize = 256 * 1024
+
     /// Scans everything under `path` that's on the same disk. Runs on a background thread; blocks until done or cancelled.
-    static func scan(path: String, title: String, progress: ScanProgress) -> Node {
-        let root = Node(name: path, isDir: true, size: 0)
-        root.displayName = title
+    static func scan(path: String, title: String, progress: ScanProgress) -> RootNode {
+        let began = Date()
+        let real = DisplayName.realPath(path) ?? path
         var st = stat()
-        guard lstat(path, &st) == 0 else {
-            root.unreadable = true
-            return root
+        guard lstat(real, &st) == 0 else {
+            let r = RootNode(path: real, displayName: title, fileID: 0)
+            r.flags.insert(.unreadable)
+            return r
         }
+        let root = RootNode(path: real, displayName: title, fileID: UInt64(st.st_ino))
         let dev = st.st_dev
-        let seen = InodeSet()
 
-        // The top two levels are listed here, and every folder below them becomes its own job,
-        // so the work spreads across all CPU cores even when one folder (like ~/Library) is huge.
+        // List the top few levels here until there are enough folders to keep every core busy,
+        // then hand each remaining folder to a worker as its own job.
+        let workers = max(2, ProcessInfo.processInfo.activeProcessorCount)
+        let target = workers * 8
+        let buf = UnsafeMutableRawPointer.allocate(byteCount: bufferSize, alignment: 16)
+        defer { buf.deallocate() }
+        var entries: [Entry] = []
+        var frontier: [Job] = [Job(node: root, path: real)]
         var jobs: [Job] = []
-        split(root, path: path, dev: dev, level: 0, jobs: &jobs, seen: seen, progress: progress)
+        var level = 0
+        var files = 0
+        var bytes: Int64 = 0
+        let seen = InodeSet()
+        while !frontier.isEmpty {
+            var next: [Job] = []
+            for job in frontier {
+                job.node.flags.insert(.split)
+                guard read(job.path, dev: dev, into: &entries, buf: buf, node: job.node, progress: progress) else { continue }
+                for e in entries {
+                    if e.isDir {
+                        if e.isMountPoint || e.dev != dev { continue }
+                        let child = Node(name: e.name, size: 0, fileID: e.fileID, flags: [.directory])
+                        job.node.add(child)
+                        next.append(Job(node: child, path: join(job.path, e.name)))
+                    } else {
+                        let size = (e.links > 1 && !seen.insert(e.fileID)) ? 0 : e.size
+                        job.node.add(Node(name: e.name, size: size, fileID: e.fileID, flags: []))
+                        files += 1
+                        bytes += size
+                    }
+                }
+            }
+            if next.count < target && level < 3 {
+                frontier = next
+                level += 1
+            } else {
+                jobs = next
+                frontier = []
+            }
+        }
+        progress.add(files: files, bytes: bytes, path: real)
 
-        var results = [Node?](repeating: nil, count: jobs.count)
-        let resultsLock = NSLock()
-        DispatchQueue.concurrentPerform(iterations: jobs.count) { i in
-            let node = walk(jobs[i].path, dev: dev, seen: seen, progress: progress)
-            resultsLock.lock()
-            results[i] = node
-            resultsLock.unlock()
+        let ctx = Context(dev: dev, progress: progress, seen: seen, jobs: jobs)
+        DispatchQueue.concurrentPerform(iterations: min(workers, max(1, jobs.count))) { _ in
+            let wbuf = UnsafeMutableRawPointer.allocate(byteCount: bufferSize, alignment: 16)
+            defer { wbuf.deallocate() }
+            var list: [Entry] = []
+            while let job = ctx.take() {
+                if ctx.progress.cancelled { break }
+                walk(job.node, path: job.path, ctx: ctx, buf: wbuf, entries: &list)
+            }
         }
-        for (i, job) in jobs.enumerated() {
-            if let n = results[i] { job.parent.add(n) }
-        }
+
         finishSplit(root)
+        root.scanSeconds = Date().timeIntervalSince(began)
+        root.skipped = progress.snapshot().skipped
         return root
     }
 
@@ -99,119 +204,171 @@ enum Scanner {
         a.hasSuffix("/") ? a + b : a + "/" + b
     }
 
-    private static func allocated(_ st: stat, seen: InodeSet) -> Int64 {
-        if st.st_nlink > 1 && !seen.insert(UInt64(st.st_ino)) { return 0 }
-        return Int64(st.st_blocks) * 512
-    }
-
-    private static func isDirectory(_ st: stat) -> Bool {
-        (Int(st.st_mode) & 0o170000) == 0o040000   // S_IFMT / S_IFDIR
-    }
-
-    private static func split(_ node: Node, path: String, dev: dev_t, level: Int,
-                              jobs: inout [Job], seen: InodeSet, progress: ScanProgress) {
-        node.splitNode = true
-        guard let names = try? FileManager.default.contentsOfDirectory(atPath: path) else {
-            node.unreadable = true
+    /// Opens a folder safely and reads its entries. Marks the node if it can't, or if it belongs to another disk.
+    private static func read(_ path: String, dev: dev_t, into entries: inout [Entry], buf: UnsafeMutableRawPointer,
+                             node: Node, progress: ScanProgress) -> Bool {
+        let fd = open(path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        if fd < 0 {
+            node.flags.insert(.unreadable)
             progress.skipped()
-            return
+            return false
         }
+        defer { close(fd) }
         var st = stat()
+        if fstat(fd, &st) == 0 && st.st_dev != dev {
+            node.flags.insert(.excluded)   // another disk is mounted here
+            return false
+        }
+        if !readEntries(fd: fd, buf: buf, into: &entries) {
+            node.flags.insert(.unreadable)
+            progress.skipped()
+            return false
+        }
+        return true
+    }
+
+    /// Walks one folder completely (iteratively, no recursion), filling in `top`.
+    private static func walk(_ top: Node, path: String, ctx: Context, buf: UnsafeMutableRawPointer, entries: inout [Entry]) {
+        var stack: [Job] = [Job(node: top, path: path)]
+        var order: [Node] = []
         var files = 0
         var bytes: Int64 = 0
-        for name in names {
-            let full = join(path, name)
-            guard lstat(full, &st) == 0 else { progress.skipped(); continue }
-            if isDirectory(st) {
-                if st.st_dev != dev { continue }   // another disk is mounted here: not part of this one
-                if level < 1 {
-                    let child = Node(name: name, isDir: true, size: Int64(st.st_blocks) * 512)
-                    node.add(child)
-                    split(child, path: full, dev: dev, level: level + 1, jobs: &jobs, seen: seen, progress: progress)
+        var dirs = 0
+        while let job = stack.popLast() {
+            order.append(job.node)
+            dirs += 1
+            if dirs & 63 == 0 && ctx.progress.cancelled { break }
+            guard read(job.path, dev: ctx.dev, into: &entries, buf: buf, node: job.node, progress: ctx.progress) else { continue }
+            job.node.children.reserveCapacity(entries.count)
+            for e in entries {
+                if e.isDir {
+                    if e.isMountPoint || e.dev != ctx.dev { continue }
+                    let child = Node(name: e.name, size: 0, fileID: e.fileID, flags: [.directory])
+                    job.node.add(child)
+                    stack.append(Job(node: child, path: join(job.path, e.name)))
                 } else {
-                    jobs.append(Job(parent: node, path: full))
+                    let size = (e.links > 1 && !ctx.seen.insert(e.fileID)) ? 0 : e.size
+                    job.node.add(Node(name: e.name, size: size, fileID: e.fileID, flags: []))
+                    files += 1
+                    bytes += size
                 }
-            } else {
-                let size = allocated(st, seen: seen)
-                node.add(Node(name: name, isDir: false, size: size))
-                files += 1
-                bytes += size
+            }
+            if files >= 4096 {
+                ctx.progress.add(files: files, bytes: bytes, path: job.path)
+                files = 0
+                bytes = 0
             }
         }
-        progress.add(files: files, bytes: bytes, path: path)
+        ctx.progress.add(files: files, bytes: bytes, path: nil)
+        // every folder comes before its subfolders in `order`, so going backwards adds up the deepest first
+        for n in order.reversed() { n.finalize() }
     }
 
     private static func finishSplit(_ node: Node) {
-        for c in node.children where c.splitNode { finishSplit(c) }
+        // the split levels are shallow (at most 4), so recursion is fine here
+        for c in node.children where c.flags.contains(.split) { finishSplit(c) }
         node.finalize()
     }
 
-    /// The name part of an fts entry (fts_name is a C flexible array, so it's read from the end of fts_path).
-    private static func entryName(_ ent: UnsafeMutablePointer<FTSENT>) -> String {
-        guard let p = ent.pointee.fts_path else { return "?" }
-        let offset = max(0, Int(ent.pointee.fts_pathlen) - Int(ent.pointee.fts_namelen))
-        return String(cString: p + offset)
+    // MARK: reading one folder
+
+    /// Fills `out` with every entry of the open folder `fd`. False if the folder couldn't be read at all.
+    static func readEntries(fd: Int32, buf: UnsafeMutableRawPointer, into out: inout [Entry]) -> Bool {
+        out.removeAll(keepingCapacity: true)
+        var al = attrlist()
+        al.bitmapcount = u_short(ATTR_BIT_MAP_COUNT)
+        al.commonattr = A.cmnReturnedAttrs | A.cmnName | A.cmnDevID | A.cmnObjType | A.cmnFileID
+        al.dirattr = A.dirMountStatus
+        al.fileattr = A.fileLinkCount | A.fileAllocSize
+
+        while true {
+            let count = getattrlistbulk(fd, &al, buf, bufferSize, 0)
+            if count == 0 { return true }
+            if count < 0 {
+                // not supported on this disk, or an entry it couldn't describe: read this folder the classic way
+                return readEntriesSlow(fd: fd, into: &out)
+            }
+            var p = UnsafeRawPointer(buf)
+            let end = UnsafeRawPointer(buf) + bufferSize
+            for _ in 0..<Int(count) {
+                guard p + 24 <= end else { break }
+                let length = Int(p.loadUnaligned(as: UInt32.self))
+                guard length >= 24, p + length <= end else { break }
+                // attribute_set_t of what was actually returned for this entry
+                let rCommon = p.loadUnaligned(fromByteOffset: 4, as: UInt32.self)
+                let rDir = p.loadUnaligned(fromByteOffset: 12, as: UInt32.self)
+                let rFile = p.loadUnaligned(fromByteOffset: 16, as: UInt32.self)
+                var off = 24
+                var name: String?
+                if rCommon & A.cmnName != 0, off + 8 <= length {
+                    // attrreference_t: offset from this field to the string, and its length (including the NUL)
+                    let nameOff = Int(p.loadUnaligned(fromByteOffset: off, as: Int32.self))
+                    let nameLen = Int(p.loadUnaligned(fromByteOffset: off + 4, as: UInt32.self))
+                    let start = off + nameOff
+                    if nameOff > 0, nameLen > 1, start + nameLen <= length {
+                        name = String(decoding: UnsafeRawBufferPointer(start: p + start, count: nameLen - 1), as: UTF8.self)
+                    }
+                    off += 8
+                }
+                var dev: dev_t = 0
+                if rCommon & A.cmnDevID != 0, off + 4 <= length {
+                    dev = p.loadUnaligned(fromByteOffset: off, as: dev_t.self); off += 4
+                }
+                var type: UInt32 = 0
+                if rCommon & A.cmnObjType != 0, off + 4 <= length {
+                    type = p.loadUnaligned(fromByteOffset: off, as: UInt32.self); off += 4
+                }
+                var fileID: UInt64 = 0
+                if rCommon & A.cmnFileID != 0, off + 8 <= length {
+                    fileID = p.loadUnaligned(fromByteOffset: off, as: UInt64.self); off += 8
+                }
+                var mountPoint = false
+                if rDir & A.dirMountStatus != 0, off + 4 <= length {
+                    mountPoint = p.loadUnaligned(fromByteOffset: off, as: UInt32.self) & A.mountPointFlag != 0; off += 4
+                }
+                var links: UInt32 = 1
+                if rFile & A.fileLinkCount != 0, off + 4 <= length {
+                    links = p.loadUnaligned(fromByteOffset: off, as: UInt32.self); off += 4
+                }
+                var size: Int64 = 0
+                if rFile & A.fileAllocSize != 0, off + 8 <= length {
+                    size = p.loadUnaligned(fromByteOffset: off, as: Int64.self); off += 8
+                }
+                if let name = name, name != ".", name != ".." {
+                    let isDir = type == A.typeDirectory
+                    out.append(Entry(name: name, isDir: isDir, isMountPoint: mountPoint, dev: dev,
+                                     fileID: fileID, links: links, size: isDir ? 0 : max(0, size)))
+                }
+                p += length
+            }
+        }
     }
 
-    /// Walks one folder completely and returns it as a finished subtree.
-    private static func walk(_ path: String, dev: dev_t, seen: InodeSet, progress: ScanProgress) -> Node? {
-        guard let cpath = strdup(path) else { return nil }
-        defer { free(cpath) }
-        var argv: [UnsafeMutablePointer<CChar>?] = [cpath, nil]
-        guard let fts = fts_open(&argv, FTS_PHYSICAL | FTS_XDEV | FTS_NOCHDIR, nil) else {
-            progress.skipped()
-            return nil
+    /// The classic way: readdir, then fstatat each entry (without following links).
+    static func readEntriesSlow(fd: Int32, into out: inout [Entry]) -> Bool {
+        out.removeAll(keepingCapacity: true)
+        let dfd = dup(fd)
+        guard dfd >= 0 else { return false }
+        guard let dirp = fdopendir(dfd) else {
+            close(dfd)
+            return false
         }
-        defer { fts_close(fts) }
-
-        var stack: [Node] = []
-        var top: Node?
-        var files = 0
-        var bytes: Int64 = 0
-        var tick = 0
-
-        while let ent = fts_read(fts) {
-            tick += 1
-            if tick & 2047 == 0 {
-                let here: String? = ent.pointee.fts_path.map { String(cString: $0) }
-                progress.add(files: files, bytes: bytes, path: here)
-                files = 0
-                bytes = 0
-                if progress.cancelled { break }
-            }
-            let info = Int32(ent.pointee.fts_info)
-            let statp: UnsafeMutablePointer<stat>? = ent.pointee.fts_statp
-            switch info {
-            case FTS_D, FTS_DNR:
-                let name = ent.pointee.fts_level == 0 ? (path as NSString).lastPathComponent : entryName(ent)
-                let own: Int64 = statp.map { Int64($0.pointee.st_blocks) * 512 } ?? 0
-                let n = Node(name: name, isDir: true, size: own)
-                if let parent = stack.last { parent.add(n) } else { top = n }
-                if info == FTS_D {
-                    stack.append(n)
-                } else {
-                    // couldn't open this folder (no permission): it stays, as an empty folder
-                    n.unreadable = true
-                    n.finalize()
-                    progress.skipped()
+        defer { closedir(dirp) }
+        rewinddir(dirp)   // the fast path may already have moved through part of the folder
+        var st = stat()
+        while let ent = readdir(dirp) {
+            let name: String = withUnsafePointer(to: ent.pointee.d_name) { tuple in
+                tuple.withMemoryRebound(to: CChar.self, capacity: MemoryLayout.size(ofValue: ent.pointee.d_name)) {
+                    String(cString: $0)
                 }
-            case FTS_DP:
-                if let n = stack.popLast() { n.finalize() }
-            case FTS_F, FTS_SL, FTS_SLNONE, FTS_DEFAULT:
-                guard let s = statp, let parent = stack.last else { continue }
-                let size = allocated(s.pointee, seen: seen)
-                parent.add(Node(name: entryName(ent), isDir: false, size: size))
-                files += 1
-                bytes += size
-            case FTS_NS, FTS_ERR:
-                progress.skipped()
-            default:
-                break   // FTS_DC (a loop), FTS_DOT: nothing to count
             }
+            if name == "." || name == ".." { continue }
+            guard fstatat(fd, name, &st, AT_SYMLINK_NOFOLLOW) == 0 else { continue }
+            let isDir = (Int(st.st_mode) & 0o170000) == 0o040000
+            out.append(Entry(name: name, isDir: isDir, isMountPoint: false, dev: st.st_dev,
+                             fileID: UInt64(st.st_ino), links: UInt32(st.st_nlink),
+                             size: isDir ? 0 : Int64(st.st_blocks) * 512))
         }
-        // cancelled part way: close up whatever is still open
-        while let n = stack.popLast() { n.finalize() }
-        progress.add(files: files, bytes: bytes, path: nil)
-        return top
+        return true
     }
 }
