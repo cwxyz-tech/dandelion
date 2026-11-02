@@ -22,11 +22,29 @@ jobs:
           git fetch --quiet --depth 1 "https://github.com/$GITHUB_REPOSITORY.git" "$GITHUB_SHA"
           git checkout --quiet FETCH_HEAD
 
-      - name: Check the engines (scanner, duplicates, rules)
-        run: sh Tests/run.sh
+      - name: Check the engines (scanner, duplicates, rules, time, zoom)
+        run: |
+          set -o pipefail
+          mkdir -p logs
+          sh Tests/run.sh 2>&1 | tee logs/checks.log
 
       - name: Build
-        run: sh build.sh
+        run: |
+          set -o pipefail
+          mkdir -p logs
+          sh build.sh 2>&1 | tee logs/build.log
+
+      # When something fails, the logs also go to a "ci-logs" branch, so they can be read with plain git
+      - name: Keep the logs on a branch
+        if: failure() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd logs || exit 0
+          git init --quiet -b ci-logs .
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" add .
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit --quiet -m "Logs from $GITHUB_SHA"
+          git push --quiet --force "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git" ci-logs
 
       - name: Zip and disk image
         run: |
