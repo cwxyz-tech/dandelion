@@ -148,8 +148,9 @@ final class RulesModel: ObservableObject {
         Task.detached(priority: .userInitiated) {
             var back: [(String, UInt64)] = []
             let problems = RulesEngine.undo(entries) { path, id in back.append((path, id)) }
+            let putBack = back
             await MainActor.run {
-                for (path, id) in back { self.undone[path] = id }
+                for (path, id) in putBack { self.undone[path] = id }
                 let undone = Set(entries.map { $0.id })
                 withAnimation(self.reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 0.85)) {
                     self.log.removeAll { undone.contains($0.id) }
