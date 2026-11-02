@@ -128,6 +128,14 @@ enum Scanner {
 
     private static let bufferSize = 256 * 1024
 
+    /// How many folders had to be read the classic way (for the scanner check).
+    static var fallbacks: Int {
+        fallbackLock.lock(); defer { fallbackLock.unlock() }
+        return fallbackCount
+    }
+    nonisolated(unsafe) private static var fallbackCount = 0
+    private static let fallbackLock = NSLock()
+
     /// Scans everything under `path` that's on the same disk. Runs on a background thread; blocks until done or cancelled.
     static func scan(path: String, title: String, progress: ScanProgress) -> RootNode {
         let began = Date()
@@ -286,6 +294,7 @@ enum Scanner {
             if count == 0 { return true }
             if count < 0 {
                 // not supported on this disk, or an entry it couldn't describe: read this folder the classic way
+                fallbackLock.lock(); fallbackCount += 1; fallbackLock.unlock()
                 return readEntriesSlow(fd: fd, into: &out)
             }
             var p = UnsafeRawPointer(buf)

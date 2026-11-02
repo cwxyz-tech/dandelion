@@ -5,6 +5,92 @@
 import Darwin
 import Foundation
 
+/// Reads every folder with getattrlistbulk on one thread, building nothing. Returns the number of entries.
+func listOnly(_ path: String) -> Int {
+    let buf = UnsafeMutableRawPointer.allocate(byteCount: 256 * 1024, alignment: 16)
+    defer { buf.deallocate() }
+    var stack = [path]
+    var entries: [Scanner.Entry] = []
+    var total = 0
+    while let p = stack.popLast() {
+        let fd = open(p, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        if fd < 0 { continue }
+        _ = Scanner.readEntries(fd: fd, buf: buf, into: &entries)
+        close(fd)
+        total += entries.count
+        for e in entries where e.isDir && !e.isMountPoint { stack.append(p + "/" + e.name) }
+    }
+    return total
+}
+
+/// Dandelion 1.0's scanner, kept here only to measure against.
+enum OldScanner {
+    static func scan(_ path: String) -> Node {
+        let root = Node(name: path, size: 0, fileID: 0, flags: [.directory])
+        var jobs: [(Node, String)] = []
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: path)) ?? []
+        var st = stat()
+        for name in names {
+            let full = path + "/" + name
+            guard lstat(full, &st) == 0 else { continue }
+            if (Int(st.st_mode) & 0o170000) == 0o040000 {
+                let child = Node(name: name, size: 0, fileID: 0, flags: [.directory])
+                root.add(child)
+                jobs.append((child, full))
+            } else {
+                root.add(Node(name: name, size: Int64(st.st_blocks) * 512, fileID: 0, flags: []))
+            }
+        }
+        let lock = NSLock()
+        var results = [Node?](repeating: nil, count: jobs.count)
+        DispatchQueue.concurrentPerform(iterations: jobs.count) { i in
+            let n = walk(jobs[i].1)
+            lock.lock(); results[i] = n; lock.unlock()
+        }
+        for (i, j) in jobs.enumerated() {
+            if let n = results[i] { j.0.children = n.children; for c in n.children { c.parent = j.0 }; j.0.finalize() }
+        }
+        root.finalize()
+        return root
+    }
+
+    static func walk(_ path: String) -> Node? {
+        guard let c = strdup(path) else { return nil }
+        defer { free(c) }
+        var argv: [UnsafeMutablePointer<CChar>?] = [c, nil]
+        guard let fts = fts_open(&argv, FTS_PHYSICAL | FTS_XDEV | FTS_NOCHDIR, nil) else { return nil }
+        defer { fts_close(fts) }
+        var stack: [Node] = []
+        var top: Node?
+        var seen = Set<UInt64>()
+        while let ent = fts_read(fts) {
+            let info = Int32(ent.pointee.fts_info)
+            let statp: UnsafeMutablePointer<stat>? = ent.pointee.fts_statp
+            let name: String = {
+                guard let p = ent.pointee.fts_path else { return "?" }
+                let off = max(0, Int(ent.pointee.fts_pathlen) - Int(ent.pointee.fts_namelen))
+                return String(cString: p + off)
+            }()
+            switch info {
+            case FTS_D:
+                let n = Node(name: name, size: 0, fileID: 0, flags: [.directory])
+                if let p = stack.last { p.add(n) } else { top = n }
+                stack.append(n)
+            case FTS_DP:
+                stack.popLast()?.finalize()
+            case FTS_F, FTS_SL, FTS_SLNONE, FTS_DEFAULT:
+                guard let s = statp, let p = stack.last else { continue }
+                var size = Int64(s.pointee.st_blocks) * 512
+                if s.pointee.st_nlink > 1 && !seen.insert(UInt64(s.pointee.st_ino)).inserted { size = 0 }
+                p.add(Node(name: name, size: size, fileID: 0, flags: []))
+            default: break
+            }
+        }
+        while let n = stack.popLast() { n.finalize() }
+        return top
+    }
+}
+
 @main
 struct ScanCheck {
     static var failures = 0
@@ -138,6 +224,22 @@ struct ScanCheck {
                      ftsTime / max(0.001, fastTime)))
         check(diff < 0.005, String(format: "real folder total within 0.5%% of fts (%.4f%%)", diff * 100))
         check(abs(Int(r.fileCount) - rr.files) <= max(5, rr.files / 1000), "real folder file count matches fts")
+
+        check(Scanner.fallbacks == 0, "the fast path was used for every folder (\(Scanner.fallbacks) fallbacks)")
+
+        // ---- speed, apples to apples ----
+        // 1) Dandelion 1.0's scanner: fts walk building the same tree (parallel jobs off the top two levels)
+        let t2 = Date()
+        let old = OldScanner.scan(real)
+        let oldTime = Date().timeIntervalSince(t2)
+        // 2) just reading the folders: one thread, getattrlistbulk vs fts (no tree)
+        let t3 = Date()
+        let listed = listOnly(real)
+        let listTime = Date().timeIntervalSince(t3)
+        print(String(format: "speed: 1.1 scanner %.2fs | 1.0 scanner %.2fs (%.1fx) | single-thread read: getattrlistbulk %.2fs (%d entries) vs fts %.2fs (%.1fx) | cores %d",
+                     fastTime, oldTime, oldTime / max(0.001, fastTime), listTime, listed, ftsTime, ftsTime / max(0.001, listTime),
+                     ProcessInfo.processInfo.activeProcessorCount))
+        check(old.size == r.size, "1.0 and 1.1 scanners agree on the total")
 
         print(failures == 0 ? "\nAll checks passed." : "\n\(failures) check(s) failed.")
         exit(failures == 0 ? 0 : 1)

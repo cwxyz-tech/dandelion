@@ -10,10 +10,12 @@ Scan a disk or folder, see everything as an interactive sunburst, find what's ea
 
 ## Features
 
-- **Fast scanning.** Uses `fts` (the walker behind `du`) split across every CPU core.
+- **Fast scanning.** Reads each folder in batches with `getattrlistbulk` (one system call per batch of entries, instead of one `stat` per file), spread across every CPU core.
 - **Interactive sunburst.** Click a folder to dive in, click the middle to go back up, hover anything to see its size.
 - **Sorted list** of the current folder alongside the chart, with breadcrumbs back up the path.
-- **Collector.** Drag files and folders to the bar at the bottom, then move them all to the Trash at once. Nothing is ever deleted outright; it all goes to the Trash.
+- **Collector.** Drag files and folders to the bar at the bottom (or press Delete), then move them all to the Trash at once. Nothing is ever deleted outright; it all goes to the Trash.
+- **Safety checks.** Right before anything moves, Dandelion makes sure it's still the same file in the same folder it scanned, and it refuses to touch folders macOS needs.
+- **Smooth.** The map sweeps in, rings bloom as you dive into folders, slices lift on hover, lists glide in. Reduce Motion turns it off.
 - **Quick Look** (Space), Reveal in Finder, Open, Copy Path from the right-click menu.
 - **Hidden space.** The part of the disk the scan can't see (the sealed system volume, snapshots, purgeable caches, unreadable folders) shows up as a grey slice, so the chart adds up to what the disk says is used.
 - **Accurate sizes.** Counts the space actually allocated on disk, and counts hard-linked files once.
@@ -44,6 +46,25 @@ Open the .dmg and drag Dandelion onto Applications. Downloaded builds are ad-hoc
 xattr -dr com.apple.quarantine /Applications/Dandelion.app
 ```
 
+## What's new in 1.1
+
+- A much faster scanner (`getattrlistbulk`, self-balancing parallel work) that uses less memory per file
+- Safety checks before the Trash: same file, same folder, and protected system and home folders
+- Animations throughout, with Reduce Motion respected
+- Faster drawing on huge folders: cached chart shapes, instant hit-testing, icons that don't touch the disk
+- Disguised file names (invisible or direction-flipping characters) are shown plainly
+- Hardened runtime, Delete to collect, live disk list, a Trash sound and confirmation
+
+## Security
+
+- No network access at all, no analytics, no accounts.
+- Built with the hardened runtime.
+- Folders are opened with `O_NOFOLLOW`, so a link swapped in mid-scan is never followed off the disk.
+- Before moving anything to the Trash it checks the file ID and its folder's ID against the scan, and blocks system folders, your home folder's top-level folders, and other users' homes.
+- Everything goes to the Trash; nothing is deleted outright.
+
+Found a problem? Please open an issue.
+
 ## Full Disk Access
 
 macOS hides some folders (Mail, Messages, Safari, other apps' containers) from every app unless you allow it. Dandelion shows a banner when it can't see them. To see everything: **System Settings → Privacy & Security → Full Disk Access**, turn on Dandelion, then rescan.
@@ -57,7 +78,10 @@ macOS hides some folders (Mail, Messages, Safari, other apps' containers) from e
 | `Sources/AppState.swift` | Scanning, navigation, the collector, Trash |
 | `Sources/Sunburst.swift` | Laying out and drawing the chart, hit testing |
 | `Sources/Views.swift` | The screens |
+| `Sources/Safety.swift` | Checks before anything goes to the Trash |
+| `Sources/Icons.swift` | Fast, cached file icons |
 | `Sources/App.swift` | App entry point and menus |
+| `Tests/ScanCheck.swift` | Compares the scanner with `fts` on a tricky test tree (runs in CI: `sh Tests/run.sh`) |
 | `docs/` | The project page (GitHub Pages) |
 
 On the startup disk, Dandelion scans the Data volume (`/System/Volumes/Data`), which is where all your files live. Other mounted disks aren't counted, even if they're mounted inside the folder being scanned.

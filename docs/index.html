@@ -59,6 +59,8 @@
   .hero .icon { width: 148px; height: 148px; filter: drop-shadow(0 16px 30px rgba(20,20,60,.25)); animation: float 6s ease-in-out infinite; }
   @keyframes float { 50% { transform: translateY(-8px) rotate(2deg); } }
   @media (prefers-reduced-motion: reduce) { .hero .icon { animation: none; } }
+  .pill { display: inline-block; margin-top: 22px; font-size: 14px; font-weight: 600; text-decoration: none; padding: 7px 14px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+  .pill:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
   .hero h1 { font-size: clamp(40px, 7vw, 76px); margin: 22px auto 16px; max-width: 900px; }
   .hero h1 em { font-style: normal; background: linear-gradient(90deg, #ff6b6b, #ffb238, #7bd35a, #3fc6e8, #8f6bff, #ff6bc8); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .hero .lede { margin: 0 auto; }
@@ -170,6 +172,9 @@
   .sum { margin: 26px auto 0; max-width: 640px; font: 12px/1.5 ui-monospace, Menlo, monospace; color: #8b8ea6; word-break: break-all; }
   .sum b { color: #c8cbe0; font-family: -apple-system, system-ui, sans-serif; font-weight: 600; }
 
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity .6s ease, transform .6s cubic-bezier(.2,.8,.2,1); }
+  .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } }
   footer { padding: 46px 0 60px; color: var(--ink3); font-size: 14px; }
   footer .wrap { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
   footer a { color: var(--ink2); }
@@ -182,6 +187,7 @@
     <a class="brand" href="#top"><img src="icon-180.png" alt="" width="30" height="30">Dandelion</a>
     <div class="links">
       <a href="#demo">Try it</a>
+      <a href="#new">What's new</a>
       <a href="#features">Features</a>
       <a href="#install">Install</a>
       <a href="#source">Source</a>
@@ -194,6 +200,7 @@
 <header class="hero" id="top">
   <div class="wrap">
     <img class="icon" src="icon-512.png" alt="Dandelion app icon" width="148" height="148">
+    <div><a class="pill" href="#new">New in 1.1: faster scans, safer cleanup, smoother everything →</a></div>
     <h1>See what's <em>filling up</em> your Mac.</h1>
     <p class="lede">Dandelion scans your disk and draws everything on it as one interactive map, so the giant forgotten folders jump right out. Then you clear them out in a couple of clicks.</p>
     <div class="cta">
@@ -206,7 +213,7 @@
         View on GitHub
       </a>
     </div>
-    <p class="meta"><b>Version 1.0</b> · 1.3 MB · macOS 14 Sonoma or later · Apple silicon and Intel · Free and open source</p>
+    <p class="meta"><b>Version 1.1</b> · about 1 MB · macOS 14 Sonoma or later · Apple silicon and Intel · Free and open source</p>
 
     <div class="demo-card" id="demo" aria-label="Interactive demo">
       <div class="win-bar">
@@ -241,7 +248,7 @@
       <div class="feat">
         <div class="ic" style="background:#e8590c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 3L5 14h6l-1 7 8-11h-6l1-7z"/></svg></div>
         <h3>Fast scanning</h3>
-        <p>Walks your disk the same way <code>du</code> does, split across every core of your Mac. Hundreds of gigabytes in under a minute.</p>
+        <p>Reads each folder in one go with the same fast system call Finder relies on, spread across every core of your Mac. Hundreds of gigabytes in seconds.</p>
       </div>
       <div class="feat">
         <div class="ic" style="background:#8f4bff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 3a9 9 0 0 1 9 9h-4a5 5 0 0 0-5-5V3zM3 12a9 9 0 0 0 9 9v-4a5 5 0 0 1-5-5H3z"/></svg></div>
@@ -251,7 +258,7 @@
       <div class="feat">
         <div class="ic" style="background:#2fb26a"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></div>
         <h3>Collect, then clean</h3>
-        <p>Drag anything onto the collector at the bottom, check the total, and move it all to the Trash at once. Nothing is ever deleted outright.</p>
+        <p>Drag anything onto the collector at the bottom, check the total, and move it all to the Trash at once. Nothing is ever deleted outright, and every item is double-checked first.</p>
       </div>
       <div class="feat">
         <div class="ic" style="background:#1c7ed6"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div>
@@ -266,7 +273,47 @@
       <div class="feat">
         <div class="ic" style="background:#d6336c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></div>
         <h3>Truly native</h3>
-        <p>Written in Swift and SwiftUI. Universal for Apple silicon and Intel, light and dark mode, about 1 MB to download.</p>
+        <p>Written in Swift and SwiftUI, with smooth animations everywhere. Universal for Apple silicon and Intel, light and dark mode, about 1 MB to download.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="new">
+  <div class="wrap">
+    <p class="eyebrow">What's new in 1.1</p>
+    <h2>Faster, safer, smoother.</h2>
+    <p class="lede">A top-to-bottom tune-up. Same app, just better at everything.</p>
+    <div class="grid">
+      <div class="feat reveal">
+        <div class="ic" style="background:#e8590c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 3L5 14h6l-1 7 8-11h-6l1-7z"/></svg></div>
+        <h3>A much faster scanner</h3>
+        <p>Folders are now read in batches with one system call each instead of one per file, and the work balances itself across every core. It also uses less memory per file.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="ic" style="background:#2fb26a"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <h3>Safety checks before the Trash</h3>
+        <p>Every item is checked right before it moves: still the same file, still in the same folder. Folders macOS depends on, and your home folders themselves, are protected.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="ic" style="background:#8f4bff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 3v4h-4M6 21v-4h4"/></svg></div>
+        <h3>Animations everywhere</h3>
+        <p>The map sweeps in, rings bloom as you dive into folders, slices lift as you hover, lists and cards glide in, and numbers roll as they change. Reduce Motion turns it all off.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="ic" style="background:#1c7ed6"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9h10M7 13h6"/></svg></div>
+        <h3>Snappier on huge folders</h3>
+        <p>The chart reuses its shapes between frames and finds what's under the pointer instantly, icons load without touching the disk, and freeing a big scan no longer pauses the window.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="ic" style="background:#d6336c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h10M4 17h7"/></svg></div>
+        <h3>Disguised names exposed</h3>
+        <p>File names that use invisible or direction-flipping characters to look like something else now show those characters plainly.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="ic" style="background:#868e96"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5v14"/></svg></div>
+        <h3>Little things</h3>
+        <p>Press Delete to collect the selected item, disks update the moment you plug one in, a sound and a note when things reach the Trash, and the hardened runtime is switched on.</p>
       </div>
     </div>
   </div>
@@ -303,6 +350,7 @@
       <p class="lede">A disk scanner sees everything you own. So Dandelion is built to be boring about it.</p>
       <ul class="checks">
         <li><span><b>No internet at all.</b> No update checks, no analytics, no crash reports. It never opens a network connection.</span></li>
+        <li><span><b>Locked down.</b> Built with Apple's hardened runtime, so nothing can inject code into it, and it never follows a link out of the disk it's scanning.</span></li>
         <li><span><b>No account, no subscription,</b> no upsell. It's free forever.</span></li>
         <li><span><b>Nothing is deleted behind your back.</b> Everything you remove goes to the Trash, so you can put it back until you empty it.</span></li>
         <li><span><b>Read every line.</b> The whole app is open source, so you don't have to take my word for any of this.</span></li>
@@ -393,12 +441,12 @@
   <div class="wrap">
     <div class="band">
       <h2>Clear out your Mac today.</h2>
-      <p class="lede">Free, open source, about 1 MB.</p>
+      <p class="lede">Free, open source, about 1 MB. Now in version 1.1.</p>
       <div class="cta">
         <a class="btn primary" href="https://github.com/cwxyz-tech/dandelion/releases/latest/download/Dandelion.dmg">Download Dandelion</a>
         <a class="btn" href="https://github.com/cwxyz-tech/dandelion/releases">All releases</a>
       </div>
-      <p class="meta">Version 1.0 · macOS 14 or later · Apple silicon and Intel</p>
+      <p class="meta">Version 1.1 · macOS 14 or later · Apple silicon and Intel</p>
       <p class="sum"><b>Check your download:</b> every release lists the SHA-256 fingerprint of its files, built in the open by GitHub Actions.</p>
     </div>
   </div>
@@ -698,6 +746,20 @@
   window.addEventListener("resize", fit);
   if (dark.addEventListener) dark.addEventListener("change", function () { draw(); renderList(); });
   start();
+
+  // cards, steps and questions float in as they scroll into view
+  (function () {
+    var els = document.querySelectorAll(".feat, .step, .note, details, .split > div, .band");
+    if (!("IntersectionObserver" in window) || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    var io = new IntersectionObserver(function (list) {
+      list.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
+    }, { rootMargin: "0px 0px -8% 0px" });
+    Array.prototype.forEach.call(els, function (el, i) {
+      el.classList.add("reveal");
+      el.style.transitionDelay = ((i % 3) * 70) + "ms";
+      io.observe(el);
+    });
+  })();
 
   // copy the build commands
   document.getElementById("copyBtn").addEventListener("click", function () {
