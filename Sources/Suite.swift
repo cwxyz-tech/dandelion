@@ -42,7 +42,7 @@ enum Tool: String, CaseIterable, Identifiable {
         }
     }
 
-    var ready: Bool { [.diskMap, .duplicates, .rules].contains(self) }
+    var ready: Bool { true }
 
     /// The tools that are actually in the app (the sidebar and the Tools menu only show these).
     static var shipped: [Tool] { allCases.filter { $0.ready } }
@@ -53,7 +53,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .duplicates: return "Find and clear copies"
         case .rules: return "Keep folders tidy on their own"
         case .screenshot: return "Capture, mark up, pin"
-        case .timeTracker: return "See where your time goes"
+        case .timeTracker: return "See where your day goes"
         case .recorder: return "Recordings that zoom to your clicks"
         }
     }
@@ -65,6 +65,7 @@ enum Brand {
 
 struct SuiteView: View {
     @EnvironmentObject var state: AppState
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         NavigationSplitView {
@@ -76,7 +77,9 @@ struct SuiteView: View {
                 case .diskMap: DiskMapView().transition(.opacity)
                 case .duplicates: DuplicatesView().transition(.opacity)
                 case .rules: RulesView().transition(.opacity)
-                case .screenshot, .timeTracker, .recorder: ComingSoonView(tool: state.tool).transition(.opacity)
+                case .screenshot: ScreenshotView().transition(.opacity)
+                case .timeTracker: TimeTrackerView().transition(.opacity)
+                case .recorder: RecorderView().transition(.opacity)
                 }
             }
             .animation(state.reduceMotion ? nil : .easeInOut(duration: 0.2), value: state.tool)
@@ -88,6 +91,10 @@ struct SuiteView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .id(t.id)
             }
+        }
+        .onAppear {
+            let open = openWindow
+            state.openMainWindow = { open(id: "main") }
         }
         .quickLookPreview($state.quickLookURL)
         .alert("Something went wrong", isPresented: Binding(
@@ -161,94 +168,6 @@ struct Sidebar: View {
         }
         .padding(.vertical, 2)
         .opacity(t.ready ? 1 : 0.75)
-    }
-}
-
-/// The tools still on the way, said plainly: what they'll do, and that they aren't here yet.
-struct ComingSoonView: View {
-    @EnvironmentObject var state: AppState
-    let tool: Tool
-    private var shownStore = State(initialValue: false)
-
-    init(tool: Tool) { self.tool = tool }
-
-    private var plan: (headline: String, like: String, points: [String]) {
-        switch tool {
-        case .screenshot:
-            return ("Capture any part of the screen, mark it up, and keep it handy.", "Like CleanShot X, for free.",
-                    ["Capture an area, a window or the whole screen with a shortcut",
-                     "Draw arrows, boxes and text, and blur anything private",
-                     "Pin a screenshot so it floats above everything",
-                     "Copy, save or drag it straight into another app"])
-        case .timeTracker:
-            return ("See which apps and sites your day actually goes to.", "Like Timing, without the subscription.",
-                    ["Logs the app you're using in the background, automatically",
-                     "Daily and weekly charts by app and category",
-                     "Everything stays on your Mac, never uploaded anywhere",
-                     "Pause any time, and delete any day's history"])
-        case .recorder:
-            return ("Screen recordings that zoom in smoothly wherever you click.", "Like Screen Studio, minus the $89.",
-                    ["Record the screen, a window or an area, with your mic",
-                     "Automatic smooth zooms that follow your clicks",
-                     "A polished cursor, padding and background",
-                     "Export for YouTube, social or anywhere else"])
-        default:
-            return ("", "", [])
-        }
-    }
-
-    var body: some View {
-        let shown = shownStore.wrappedValue
-        let p = plan
-        VStack(spacing: 18) {
-            Spacer()
-            Image(systemName: tool.symbol)
-                .font(.system(size: 44, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 96, height: 96)
-                .background(LinearGradient(colors: [tool.tint, tool.tint.opacity(0.7)], startPoint: .top, endPoint: .bottom),
-                            in: RoundedRectangle(cornerRadius: 24))
-                .shadow(color: tool.tint.opacity(0.4), radius: 16, y: 8)
-                .scaleEffect(shown ? 1 : 0.7)
-                .rotationEffect(.degrees(shown ? 0 : -12))
-            HStack(spacing: 8) {
-                Text(tool.title).font(.system(size: 28, weight: .bold, design: .rounded))
-                Text("COMING SOON")
-                    .font(.system(size: 10, weight: .bold))
-                    .padding(.horizontal, 7).padding(.vertical, 3)
-                    .background(tool.tint.opacity(0.15), in: Capsule())
-                    .foregroundStyle(tool.tint)
-            }
-            Text(p.headline).font(.system(size: 15)).foregroundStyle(.secondary).multilineTextAlignment(.center)
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(Array(p.points.enumerated()), id: \.offset) { i, point in
-                    HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: "checkmark.circle.fill").foregroundStyle(tool.tint)
-                        Text(point).font(.system(size: 13))
-                    }
-                    .opacity(shown ? 1 : 0)
-                    .offset(x: shown ? 0 : 16)
-                    .animation(state.reduceMotion ? nil : .spring(response: 0.5, dampingFraction: 0.8).delay(0.1 + Double(i) * 0.06), value: shown)
-                }
-            }
-            .padding(20)
-            .frame(maxWidth: 460, alignment: .leading)
-            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 14))
-            Text("\(p.like) It isn't built yet; it's planned for a future update.")
-                .font(.system(size: 12))
-                .foregroundStyle(.tertiary)
-            Spacer()
-        }
-        .padding(30)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear {
-            if state.reduceMotion { shownStore.wrappedValue = true; return }
-            withAnimation(.spring(response: 0.55, dampingFraction: 0.7)) { shownStore.wrappedValue = true }
-        }
-        .onChange(of: tool) {
-            shownStore.wrappedValue = false
-            withAnimation(state.reduceMotion ? nil : .spring(response: 0.55, dampingFraction: 0.7)) { shownStore.wrappedValue = true }
-        }
     }
 }
 

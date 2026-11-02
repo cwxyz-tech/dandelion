@@ -42,6 +42,9 @@ jobs:
           defaults write xyz.coleswebsite.dandelion rulesAutoRun -bool false
           perl -e "alarm 240; exec @ARGV" "$APP" --snapshot shots/screenshot-light.png --scan /Applications
           perl -e "alarm 240; exec @ARGV" "$APP" --snapshot shots/screenshot-dark.png --scan /Applications --dark
+          for t in screenshot timeTracker recorder; do
+            perl -e "alarm 60; exec @ARGV" "$APP" --snapshot "shots/tool-$t.png" --tool "$t" || true
+          done
           ls -la shots
 
       # Also kept on a "screenshots" branch, so they can be fetched with plain git

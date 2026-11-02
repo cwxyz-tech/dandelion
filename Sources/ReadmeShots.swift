@@ -1,6 +1,7 @@
 // Dandelion - makes the screenshots in the README. Only runs when asked from the command line:
 //     Dandelion.app/Contents/MacOS/Dandelion --snapshot out.png --scan /Applications [--dark]
-// It scans the folder, waits for the chart to settle, saves a picture of its own window and quits.
+//     Dandelion.app/Contents/MacOS/Dandelion --snapshot out.png --tool timeTracker   (made-up sample day)
+// It scans the folder (or opens the tool), waits for it to settle, saves a picture of its own window and quits.
 // It never touches anything on disk except writing that one picture.
 // MIT License. See LICENSE.
 
@@ -15,8 +16,21 @@ enum ReadmeShots {
             guard let i = args.firstIndex(of: flag), i + 1 < args.count else { return nil }
             return args[i + 1]
         }
-        guard let out = value("--snapshot"), let folder = value("--scan") else { return }
+        guard let out = value("--snapshot") else { return }
         NSApp.appearance = NSAppearance(named: args.contains("--dark") ? .darkAqua : .aqua)
+        if let name = value("--tool"), let tool = Tool(rawValue: name) {
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2))
+                if let w = mainWindow { w.setContentSize(NSSize(width: 1260, height: 800)); w.center() }
+                state.tool = tool
+                if tool == .timeTracker { state.timeTracker.showSample() }
+                try? await Task.sleep(for: .seconds(3))
+                save(to: out)
+                exit(0)
+            }
+            return
+        }
+        guard let folder = value("--scan") else { return }
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(2))
             if let w = mainWindow { w.setContentSize(NSSize(width: 1260, height: 800)); w.center() }

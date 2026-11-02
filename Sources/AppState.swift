@@ -48,10 +48,17 @@ final class AppState: ObservableObject {
     @Published var trashing = false
     @Published var toast: Toast?
     @Published var alertMessage: String?
+    /// True while the Screen Recorder is recording (shows the red menu bar item).
+    @Published var recordingNow = false
+    /// Opens the main window again (set by the window itself, so the menu bar and shortcuts can bring it back).
+    var openMainWindow: (() -> Void)?
 
     let hover = HoverModel()
     let duplicates = DuplicatesModel()
     let rules = RulesModel()
+    let screenshots = ScreenshotModel()
+    let timeTracker = TimeTrackerModel()
+    let recorder = RecorderModel()
     let appVersion = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "2.0"
     var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
 
@@ -64,9 +71,15 @@ final class AppState: ObservableObject {
     init() {
         duplicates.app = self
         rules.app = self
+        screenshots.app = self
+        timeTracker.app = self
+        recorder.app = self
         refreshVolumes()
         checkFullDiskAccess()
         rules.start()
+        screenshots.start()
+        timeTracker.start()
+        recorder.start()
         ReadmeShots.startIfAsked(self)
         // keep the disk list current when drives are plugged in, ejected or renamed
         let nc = NSWorkspace.shared.notificationCenter
@@ -202,6 +215,15 @@ final class AppState: ObservableObject {
         timer = nil
         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.3)) { phase = .home }
         refreshVolumes()
+    }
+
+    /// Shows the main window on a tool, even if Dandelion was only in the menu bar.
+    func bringToFront(tool t: Tool) {
+        tool = t
+        NSApp.setActivationPolicy(.regular)
+        NSApp.unhide(nil)
+        if !NSApp.windows.contains(where: { $0.isVisible && $0.canBecomeMain }) { openMainWindow?() }
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     func goHome() {

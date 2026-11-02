@@ -15,6 +15,10 @@ struct Checks {
         RulesCheck.run()
         print("== Tree after trashing")
         TreeCheck.run()
+        print("== Time Tracker")
+        TimeCheck.run()
+        print("== Screen Recorder zoom")
+        ZoomCheck.run()
         let failures = ScanCheck.failures
         print(failures == 0 ? "\nAll checks passed." : "\n\(failures) check(s) failed.")
         exit(failures == 0 ? 0 : 1)

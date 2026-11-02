@@ -34,7 +34,8 @@ iconutil -c icns Icon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
 
 # ad-hoc signature (required on Apple Silicon, no Apple developer account needed), with the hardened runtime:
 # no code injection, no unsigned libraries, no debugger attaching to it
-codesign --force --options runtime --timestamp=none --sign - "$APP"
+# the one exception it allows: the microphone, for Screen Recorder (macOS still asks you first)
+codesign --force --options runtime --timestamp=none --entitlements Dandelion.entitlements --sign - "$APP"
 codesign --verify --strict "$APP"
 
 echo ""
