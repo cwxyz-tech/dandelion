@@ -14,7 +14,8 @@ private func entrance(_ index: Int, reduce: Bool) -> Animation? {
     reduce ? nil : .spring(response: 0.42, dampingFraction: 0.82).delay(Double(min(index, 24)) * 0.018)
 }
 
-struct ContentView: View {
+/// The Disk Map tool: pick a disk, scan it, explore it.
+struct DiskMapView: View {
     @EnvironmentObject var state: AppState
 
     var body: some View {
@@ -27,23 +28,6 @@ struct ContentView: View {
             case .results:
                 ResultsView().transition(.opacity)
             }
-        }
-        .overlay(alignment: .bottom) {
-            if let t = state.toast {
-                ToastView(toast: t)
-                    .padding(.bottom, state.phase == .results ? 72 : 24)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .id(t.id)
-            }
-        }
-        .quickLookPreview($state.quickLookURL)
-        .alert("Something went wrong", isPresented: Binding(
-            get: { state.alertMessage != nil },
-            set: { if !$0 { state.alertMessage = nil } })
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(state.alertMessage ?? "")
         }
     }
 }
@@ -105,19 +89,10 @@ struct HomeView: View {
         let shown = shownStore.wrappedValue
         VStack(spacing: 22) {
             Spacer(minLength: 10)
-            VStack(spacing: 8) {
-                Image(nsImage: NSApp.applicationIconImage)
-                    .resizable()
-                    .frame(width: 92, height: 92)
-                    .shadow(color: .black.opacity(0.18), radius: 10, y: 6)
-                    .scaleEffect(shown ? 1 : 0.6)
-                    .rotationEffect(.degrees(shown ? 0 : -25))
-                Text("Dandelion")
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
-                Text("See what's taking up space on your Mac, and clear it out.")
-                    .foregroundStyle(.secondary)
-            }
-            .opacity(shown ? 1 : 0)
+            ToolHeader(tool: .diskMap, subtitle: "See what's taking up space on your Mac, and clear it out.")
+                .frame(maxWidth: 620)
+                .opacity(shown ? 1 : 0)
+                .offset(y: shown ? 0 : -10)
             if !state.hasFullDiskAccess {
                 AccessBanner().frame(maxWidth: 620)
             }
@@ -146,10 +121,6 @@ struct HomeView: View {
                 .controlSize(.large)
             }
             Spacer(minLength: 10)
-            Text("Version \(state.appVersion) · Free and open source · MIT License")
-                .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
-                .padding(.bottom, 12)
         }
         .padding(.horizontal, 30)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

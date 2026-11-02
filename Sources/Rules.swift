@@ -229,7 +229,8 @@ enum RulesEngine {
         }
         if rule.action.kind != .moveToTrash && !rule.action.destination.isEmpty {
             let d = Safety.logicalPath(DisplayName.realPath(rule.action.destination) ?? rule.action.destination)
-            if d.hasPrefix("/System") || d.hasPrefix("/usr/") || d == "/" || d.hasPrefix("/Library/") || d.hasPrefix("/private/") {
+            let systemSpots = ["/System", "/usr/", "/Library/", "/bin", "/sbin", "/private/etc", "/private/var/db", "/private/var/vm"]
+            if d == "/" || systemSpots.contains(where: { d.hasPrefix($0) }) {
                 return "\u{201C}\(rule.name)\u{201D} can't move files into a system folder."
             }
         }

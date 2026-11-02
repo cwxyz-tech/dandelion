@@ -30,6 +30,7 @@ struct Toast: Identifiable, Equatable {
 final class AppState: ObservableObject {
     enum Phase { case home, scanning, results }
 
+    @Published var tool: Tool = .diskMap
     @Published var phase: Phase = .home
     @Published var volumes: [VolumeInfo] = []
     @Published var root: RootNode?
@@ -49,7 +50,9 @@ final class AppState: ObservableObject {
     @Published var alertMessage: String?
 
     let hover = HoverModel()
-    let appVersion = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "1.1"
+    let duplicates = DuplicatesModel()
+    let rules = RulesModel()
+    let appVersion = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "2.0"
     var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
 
     private var progress: ScanProgress?
@@ -59,8 +62,11 @@ final class AppState: ObservableObject {
     private var observers: [NSObjectProtocol] = []
 
     init() {
+        duplicates.app = self
+        rules.app = self
         refreshVolumes()
         checkFullDiskAccess()
+        rules.start()
         // keep the disk list current when drives are plugged in, ejected or renamed
         let nc = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification, NSWorkspace.didRenameVolumeNotification] {

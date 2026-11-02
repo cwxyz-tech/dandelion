@@ -17,12 +17,14 @@ struct DandelionApp: App {
 
     var body: some Scene {
         Window("Dandelion", id: "main") {
-            ContentView()
+            SuiteView()
                 .environmentObject(state)
                 .environmentObject(state.hover)
-                .frame(minWidth: 900, minHeight: 620)
+                .environmentObject(state.duplicates)
+                .environmentObject(state.rules)
+                .frame(minWidth: 1020, minHeight: 660)
         }
-        .defaultSize(width: 1180, height: 780)
+        .defaultSize(width: 1260, height: 800)
         .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(replacing: .newItem) {
@@ -32,15 +34,21 @@ struct DandelionApp: App {
                     .keyboardShortcut("r")
                     .disabled(!state.canRescan)
                 Divider()
-                Button("Show Disks") { state.goHome() }
+                Button("Show Disks") { state.tool = .diskMap; state.goHome() }
                     .keyboardShortcut("d", modifiers: [.command, .shift])
+            }
+            CommandMenu("Tools") {
+                ForEach(Array(Tool.allCases.enumerated()), id: \.element) { i, t in
+                    Button(t.title) { state.tool = t }
+                        .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
+                }
             }
             CommandGroup(replacing: .appInfo) {
                 Button("About Dandelion") {
                     NSApp.orderFrontStandardAboutPanel(options: [
                         .applicationName: "Dandelion",
                         .applicationVersion: state.appVersion,
-                        .credits: NSAttributedString(string: "Free and open source under the MIT License.\ncoleswebsite.xyz/dandelion"),
+                        .credits: NSAttributedString(string: "\(Brand.catchphrase)\nFree and open source under the MIT License.\ncoleswebsite.xyz/dandelion"),
                     ])
                 }
             }
