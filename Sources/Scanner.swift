@@ -89,26 +89,60 @@ enum Scanner {
         let path: String
     }
 
+    /// The shared work queue. Workers take folders from it; when someone's idle, busy workers hand over
+    /// subfolders instead of keeping them, so one giant folder can't leave the other cores waiting.
     private final class Context: @unchecked Sendable {
         let dev: dev_t
         let progress: ScanProgress
         let seen: InodeSet
-        private let lock = NSLock()
-        private var jobs: [Job]
-        private var next = 0
+        private let cond = NSCondition()
+        private var queue: [Job]
+        private var active = 0
+        private var waiting = 0
 
         init(dev: dev_t, progress: ScanProgress, seen: InodeSet, jobs: [Job]) {
             self.dev = dev
             self.progress = progress
             self.seen = seen
-            self.jobs = jobs
+            self.queue = jobs
         }
 
+        /// Next folder to walk, or nil once every folder is done.
         func take() -> Job? {
-            lock.lock(); defer { lock.unlock() }
-            guard next < jobs.count else { return nil }
-            next += 1
-            return jobs[next - 1]
+            cond.lock(); defer { cond.unlock() }
+            while true {
+                if let job = queue.popLast() {
+                    active += 1
+                    return job
+                }
+                if active == 0 {
+                    cond.broadcast()
+                    return nil
+                }
+                waiting += 1
+                cond.wait()
+                waiting -= 1
+            }
+        }
+
+        func finished() {
+            cond.lock()
+            active -= 1
+            if active == 0 && queue.isEmpty { cond.broadcast() }
+            cond.unlock()
+        }
+
+        /// True when another worker is waiting for something to do.
+        var hungry: Bool {
+            cond.lock(); defer { cond.unlock() }
+            return waiting > 0 && queue.isEmpty
+        }
+
+        func share(_ jobs: ArraySlice<Job>) {
+            cond.lock()
+            queue.append(contentsOf: jobs)
+            cond.broadcast()
+            cond.unlock()
         }
     }
 
@@ -192,16 +226,18 @@ enum Scanner {
         progress.add(files: files, bytes: bytes, path: real)
 
         let ctx = Context(dev: dev, progress: progress, seen: seen, jobs: jobs)
-        DispatchQueue.concurrentPerform(iterations: min(workers, max(1, jobs.count))) { _ in
+        DispatchQueue.concurrentPerform(iterations: workers) { _ in
             let wbuf = UnsafeMutableRawPointer.allocate(byteCount: bufferSize, alignment: 16)
             defer { wbuf.deallocate() }
             var list: [Entry] = []
             while let job = ctx.take() {
-                if ctx.progress.cancelled { break }
-                walk(job.node, path: job.path, ctx: ctx, buf: wbuf, entries: &list)
+                if !ctx.progress.cancelled { walk(job.node, path: job.path, ctx: ctx, buf: wbuf, entries: &list) }
+                ctx.finished()
             }
         }
 
+        // add everything up, bottom to top: each original job's folder in parallel, then the top levels
+        DispatchQueue.concurrentPerform(iterations: jobs.count) { i in finalizeTree(jobs[i].node) }
         finishSplit(root)
         root.scanSeconds = Date().timeIntervalSince(began)
         root.skipped = progress.snapshot().skipped
@@ -235,19 +271,18 @@ enum Scanner {
         return true
     }
 
-    /// Walks one folder completely (iteratively, no recursion), filling in `top`.
+    /// Walks one folder (iteratively, no recursion), filling in `top`. Subfolders may be handed to other workers.
     private static func walk(_ top: Node, path: String, ctx: Context, buf: UnsafeMutableRawPointer, entries: inout [Entry]) {
         var stack: [Job] = [Job(node: top, path: path)]
-        var order: [Node] = []
         var files = 0
         var bytes: Int64 = 0
         var dirs = 0
         while let job = stack.popLast() {
-            order.append(job.node)
             dirs += 1
             if dirs & 63 == 0 && ctx.progress.cancelled { break }
             guard read(job.path, dev: ctx.dev, into: &entries, buf: buf, node: job.node, progress: ctx.progress) else { continue }
             job.node.children.reserveCapacity(entries.count)
+            let before = stack.count
             for e in entries {
                 if e.isDir {
                     if e.isMountPoint || e.dev != ctx.dev { continue }
@@ -261,6 +296,11 @@ enum Scanner {
                     bytes += size
                 }
             }
+            // someone's idle: give them all but one of the subfolders just found
+            if stack.count - before > 1 && (dirs & 7 == 0 || stack.count > 64) && ctx.hungry {
+                ctx.share(stack[(before + 1)...])
+                stack.removeSubrange((before + 1)...)
+            }
             if files >= 4096 {
                 ctx.progress.add(files: files, bytes: bytes, path: job.path)
                 files = 0
@@ -268,7 +308,16 @@ enum Scanner {
             }
         }
         ctx.progress.add(files: files, bytes: bytes, path: nil)
-        // every folder comes before its subfolders in `order`, so going backwards adds up the deepest first
+    }
+
+    /// Adds up a finished subtree, deepest folders first (iteratively, so very deep trees are fine).
+    private static func finalizeTree(_ top: Node) {
+        var stack = [top]
+        var order: [Node] = []
+        while let n = stack.popLast() {
+            order.append(n)
+            for c in n.children where c.isDir { stack.append(c) }
+        }
         for n in order.reversed() { n.finalize() }
     }
 
