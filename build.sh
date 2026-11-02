@@ -16,8 +16,8 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 BINS=""
 for arch in $ARCHS; do
   echo "== compiling for $arch"
-  xcrun swiftc -parse-as-library -O -swift-version 5 \
-    -sdk "$SDK" -target "$arch-apple-macos14.0" \
+  xcrun swiftc -parse-as-library -O -wmo -swift-version 5 \
+    -sdk "$SDK" -target "$arch-apple-macos14.0" -Xlinker -dead_strip \
     Sources/*.swift -o "build/Dandelion-$arch"
   BINS="$BINS build/Dandelion-$arch"
 done
@@ -32,8 +32,10 @@ if [ -f VERSION ]; then
 fi
 iconutil -c icns Icon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
 
-# ad-hoc signature: required to run on Apple Silicon (no Apple developer account needed)
-codesign --force --sign - "$APP"
+# ad-hoc signature (required on Apple Silicon, no Apple developer account needed), with the hardened runtime:
+# no code injection, no unsigned libraries, no debugger attaching to it
+codesign --force --options runtime --timestamp=none --sign - "$APP"
+codesign --verify --strict "$APP"
 
 echo ""
 echo "Built $APP"

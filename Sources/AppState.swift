@@ -1,4 +1,4 @@
-// Dandelion - app state: scanning, navigation, the collector and deleting.
+// Dandelion - app state: scanning, navigation, the collector and the Trash.
 // MIT License. See LICENSE.
 
 import AppKit
@@ -6,36 +6,68 @@ import Darwin
 import Foundation
 import SwiftUI
 
+/// What the pointer is over. Kept apart from AppState so moving the mouse only redraws the chart and the
+/// list rows, not the whole window.
+@MainActor
+final class HoverModel: ObservableObject {
+    @Published var node: Node?
+
+    func set(_ n: Node?) {
+        if node !== n { node = n }
+    }
+}
+
+struct Toast: Identifiable, Equatable {
+    let id = UUID()
+    let text: String
+    let symbol: String
+    let tint: Color
+
+    static func == (a: Toast, b: Toast) -> Bool { a.id == b.id }
+}
+
 @MainActor
 final class AppState: ObservableObject {
     enum Phase { case home, scanning, results }
 
     @Published var phase: Phase = .home
     @Published var volumes: [VolumeInfo] = []
-    @Published var root: Node?
+    @Published var root: RootNode?
     @Published var focus: Node?
-    @Published var hovered: Node?
     @Published var selected: Node?
     @Published var collector: [Node] = []
-    /// Bumped whenever the tree changes (after deleting), so the chart redraws.
+    /// Bumped whenever the tree changes (after moving things to the Trash), so the chart redraws.
     @Published var version = 0
     @Published var scanTitle = ""
     @Published var live = ScanProgress.Snapshot()
-    @Published var elapsed: TimeInterval = 0
-    @Published var skipped = 0
+    @Published var elapsed: Double = 0
     @Published var hasFullDiskAccess = true
     @Published var quickLookURL: URL?
-    @Published var confirmDelete = false
+    @Published var confirmTrash = false
+    @Published var trashing = false
+    @Published var toast: Toast?
     @Published var alertMessage: String?
+
+    let hover = HoverModel()
+    let appVersion = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "1.1"
+    var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
 
     private var progress: ScanProgress?
     private var timer: Timer?
     private var lastScan: (path: String, title: String, isVolume: Bool)?
-    private var iconCache: [String: NSImage] = [:]
+    private var toastTask: Task<Void, Never>?
+    private var observers: [NSObjectProtocol] = []
 
     init() {
         refreshVolumes()
         checkFullDiskAccess()
+        // keep the disk list current when drives are plugged in, ejected or renamed
+        let nc = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification, NSWorkspace.didRenameVolumeNotification] {
+            observers.append(nc.addObserver(forName: name, object: nil, queue: .main) { _ in
+                Task { @MainActor in self.refreshVolumes() }
+            })
+        }
     }
 
     // MARK: disks and permissions
@@ -46,7 +78,7 @@ final class AppState: ObservableObject {
 
     /// Without Full Disk Access, macOS hides parts of your Library (Mail, Messages, Safari, other apps' data) from every app.
     func checkFullDiskAccess() {
-        let fd = Darwin.open("/Library/Application Support/com.apple.TCC/TCC.db", O_RDONLY)
+        let fd = Darwin.open("/Library/Application Support/com.apple.TCC/TCC.db", O_RDONLY | O_CLOEXEC)
         if fd >= 0 {
             Darwin.close(fd)
             hasFullDiskAccess = true
@@ -96,12 +128,8 @@ final class AppState: ObservableObject {
         scanTitle = title
         live = ScanProgress.Snapshot()
         elapsed = 0
-        root = nil
-        focus = nil
-        hovered = nil
-        selected = nil
-        collector = []
-        phase = .scanning
+        dropTree()
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.3)) { phase = .scanning }
 
         let began = Date()
         // (AppState lives as long as the app, so holding on to it here is fine)
@@ -131,27 +159,28 @@ final class AppState: ObservableObject {
         return max(0, Int64(total) - Int64(avail) - scanned)
     }
 
-    private func finish(_ tree: Node, hidden: Int64, progress prog: ScanProgress) {
-        guard progress === prog else { return }   // a newer scan replaced this one
+    private func finish(_ tree: RootNode, hidden: Int64, progress prog: ScanProgress) {
+        guard progress === prog else {
+            AppState.release(tree)   // a newer scan replaced this one
+            return
+        }
         timer?.invalidate()
         timer = nil
         if prog.cancelled {
-            phase = .home
+            AppState.release(tree)
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.3)) { phase = .home }
             refreshVolumes()
             return
         }
         if hidden > 0 {
-            let h = Node(name: "Hidden space", isDir: false, size: hidden)
-            h.isSynthetic = true
-            h.fileCount = 0
+            let h = Node(name: "Hidden space", size: hidden, fileID: 0, flags: [.synthetic])
             tree.add(h)
             tree.finalize()
         }
-        skipped = prog.snapshot().skipped
         root = tree
         focus = tree
         version += 1
-        phase = .results
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.35)) { phase = .results }
         checkFullDiskAccess()
     }
 
@@ -159,21 +188,33 @@ final class AppState: ObservableObject {
         progress?.cancel()
         timer?.invalidate()
         timer = nil
-        phase = .home
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.3)) { phase = .home }
         refreshVolumes()
     }
 
     func goHome() {
         progress?.cancel()
-        phase = .home
-        root = nil
-        focus = nil
-        hovered = nil
-        selected = nil
-        collector = []
-        iconCache = [:]
+        dropTree()
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.3)) { phase = .home }
         refreshVolumes()
         checkFullDiskAccess()
+    }
+
+    /// Lets go of the current tree. A big disk is millions of objects, so they're freed on a background
+    /// thread instead of freezing the window for a moment.
+    private func dropTree() {
+        let old = root
+        root = nil
+        focus = nil
+        selected = nil
+        hover.set(nil)
+        collector = []
+        Icons.shared.forget()
+        if let old = old { AppState.release(old) }
+    }
+
+    nonisolated private static func release(_ tree: RootNode) {
+        DispatchQueue.global(qos: .utility).async { withExtendedLifetime(tree) {} }
     }
 
     // MARK: moving around
@@ -183,15 +224,15 @@ final class AppState: ObservableObject {
             selected = node
             return
         }
-        hovered = nil
+        hover.set(nil)
         selected = nil
-        withAnimation(.easeOut(duration: 0.22)) { focus = node }
+        focus = node
     }
 
     func up() {
         guard let p = focus?.parent else { return }
-        hovered = nil
-        withAnimation(.easeOut(duration: 0.22)) { focus = p }
+        hover.set(nil)
+        focus = p
     }
 
     var canGoUp: Bool { focus?.parent != nil }
@@ -200,14 +241,14 @@ final class AppState: ObservableObject {
     func node(forPath rawPath: String) -> Node? {
         guard let r = root else { return nil }
         let rootPath = r.path
-        var p = rawPath
+        var p = DisplayName.realPath(rawPath) ?? rawPath
         if p.hasSuffix("/") && p.count > 1 { p.removeLast() }
         // on the startup disk, /Users/... really lives at /System/Volumes/Data/Users/...
         if rootPath == "/System/Volumes/Data" && !p.hasPrefix(rootPath) { p = rootPath + p }
         if p == rootPath { return r }
         let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
         guard p.hasPrefix(prefix) else { return nil }
-        var cur = r
+        var cur: Node = r
         for comp in p.dropFirst(prefix.count).split(separator: "/") {
             guard let next = cur.children.first(where: { $0.name == comp }) else { return nil }
             cur = next
@@ -218,14 +259,26 @@ final class AppState: ObservableObject {
     // MARK: the collector
 
     func collect(_ node: Node) {
-        guard node.canTouch else { return }
+        if let reason = Safety.protectionReason(node) {
+            show(Toast(text: reason, symbol: "lock.fill", tint: .orange))
+            NSSound.beep()
+            return
+        }
         if collector.contains(where: { $0.isAncestor(of: node) }) { return }   // already in there (or its folder is)
-        collector.removeAll { node.isAncestor(of: $0) }                       // its folder replaces anything inside it
-        withAnimation(.easeOut(duration: 0.2)) { collector.append(node) }
+        withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.75)) {
+            collector.removeAll { node.isAncestor(of: $0) }                    // its folder replaces anything inside it
+            collector.append(node)
+        }
     }
 
     func uncollect(_ node: Node) {
-        withAnimation(.easeOut(duration: 0.2)) { collector.removeAll { $0 === node } }
+        withAnimation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.8)) {
+            collector.removeAll { $0 === node }
+        }
+    }
+
+    func clearCollector() {
+        withAnimation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.8)) { collector = [] }
     }
 
     func isCollected(_ node: Node) -> Bool {
@@ -235,25 +288,70 @@ final class AppState: ObservableObject {
     var collectedBytes: Int64 { collector.reduce(0) { $0 + $1.size } }
 
     /// Moves everything in the collector to the Trash (nothing is ever deleted outright).
+    /// Each item is checked first: still the same file, in the same folder, and not something macOS needs.
     func trashCollected() {
-        var failed: [String] = []
-        for n in collector {
-            do {
-                try FileManager.default.trashItem(at: n.url, resultingItemURL: nil)
-                n.removeFromTree()
-            } catch {
-                failed.append("\(n.title): \(error.localizedDescription)")
+        guard !collector.isEmpty, !trashing else { return }
+        let items = collector
+        let jobs: [(Node, String)] = items.map { ($0, $0.path) }
+        trashing = true
+        Task.detached(priority: .userInitiated) {
+            var moved: [Node] = []
+            var failed: [String] = []
+            for (node, path) in jobs {
+                if let reason = Safety.protectionReason(node) ?? Safety.verify(node) {
+                    failed.append(reason)
+                    continue
+                }
+                do {
+                    try FileManager.default.trashItem(at: URL(fileURLWithPath: path), resultingItemURL: nil)
+                    moved.append(node)
+                } catch {
+                    failed.append("\(node.title): \(error.localizedDescription)")
+                }
             }
+            await self.finishTrash(moved: moved, failed: failed)
         }
-        collector = []
-        if let r = root {
-            if let f = focus, !r.isAncestor(of: f) { focus = r }
-            if let s = selected, !r.isAncestor(of: s) { selected = nil }
+    }
+
+    private func finishTrash(moved: [Node], failed: [String]) {
+        trashing = false
+        let freed = moved.reduce(Int64(0)) { $0 + $1.size }
+        withAnimation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 0.8)) {
+            for n in moved { n.removeFromTree() }
+            collector.removeAll { n in moved.contains { $0 === n } }
+            if let r = root {
+                if let f = focus, !r.isAncestor(of: f) { focus = r }
+                if let s = selected, !r.isAncestor(of: s) { selected = nil }
+            }
+            hover.set(nil)
+            version += 1
         }
-        hovered = nil
-        version += 1
+        if !moved.isEmpty {
+            playTrashSound()
+            show(Toast(text: "Moved \(moved.count == 1 ? "1 item" : "\(moved.count) items") to the Trash · \(Fmt.bytes(freed)) back once you empty it",
+                       symbol: "trash.fill", tint: .green))
+        }
         if !failed.isEmpty {
-            alertMessage = "These couldn't be moved to the Trash:\n\n" + failed.joined(separator: "\n")
+            alertMessage = (moved.isEmpty ? "Nothing was moved:" : "Some items weren't moved:") + "\n\n" + failed.joined(separator: "\n")
+        }
+    }
+
+    private func playTrashSound() {
+        let path = "/System/Library/Components/CoreAudio.component/Contents/SharedSupport/SystemSounds/finder/move to trash.aif"
+        if FileManager.default.fileExists(atPath: path) {
+            NSSound(contentsOfFile: path, byReference: true)?.play()
+        }
+    }
+
+    // MARK: toasts
+
+    func show(_ t: Toast) {
+        toastTask?.cancel()
+        withAnimation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 0.8)) { toast = t }
+        toastTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 3_200_000_000)
+            if Task.isCancelled { return }
+            withAnimation(self.reduceMotion ? nil : .easeIn(duration: 0.25)) { self.toast = nil }
         }
     }
 
@@ -270,8 +368,10 @@ final class AppState: ObservableObject {
     }
 
     func copyPath(_ node: Node) {
+        guard !node.isSynthetic else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(node.path, forType: .string)
+        show(Toast(text: "Copied the path", symbol: "doc.on.doc.fill", tint: .blue))
     }
 
     func quickLook(_ node: Node?) {
@@ -279,27 +379,13 @@ final class AppState: ObservableObject {
         quickLookURL = n.url
     }
 
-    func icon(for node: Node) -> NSImage {
-        if node.isSynthetic {
-            return NSImage(systemSymbolName: "eye.slash", accessibilityDescription: "Hidden space") ?? NSImage()
-        }
-        let key = node.path
-        if let cached = iconCache[key] { return cached }
-        let img = NSWorkspace.shared.icon(forFile: key)
-        if iconCache.count > 4000 { iconCache.removeAll() }
-        iconCache[key] = img
-        return img
-    }
-
     // MARK: describing things
 
     func detail(for node: Node) -> String {
-        if node.isSynthetic {
-            return "System files, snapshots, purgeable space and files Dandelion couldn't read"
-        }
+        if node.isSynthetic { return "System, snapshots, purgeable space and anything unreadable" }
         if node.unreadable { return "No permission to look inside" }
         if node.isDir { return Fmt.items(node.fileCount) }
-        return (node.name as NSString).pathExtension.uppercased().isEmpty
-            ? "File" : (node.name as NSString).pathExtension.uppercased() + " file"
+        let ext = (node.name as NSString).pathExtension.uppercased()
+        return ext.isEmpty ? "File" : "\(DisplayName.clean(ext)) file"
     }
 }

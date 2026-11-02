@@ -123,7 +123,9 @@ struct ScanCheck {
         try? fm.removeItem(atPath: base)
 
         // ---- a real folder: correctness and speed ----
-        let real = fm.fileExists(atPath: "/Applications/Xcode.app") ? "/Applications/Xcode.app" : "/usr"
+        let picked = fm.fileExists(atPath: "/Applications/Xcode.app") ? "/Applications/Xcode.app" : "/usr"
+        let real = DisplayName.realPath(picked) ?? picked   // Xcode.app is often a link to a versioned copy
+        _ = reference(real)                                  // warm the disk cache so both runs start equal
         let t0 = Date()
         let r = Scanner.scan(path: real, title: "real", progress: ScanProgress())
         let fastTime = Date().timeIntervalSince(t0)

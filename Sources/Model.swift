@@ -243,3 +243,4 @@ enum Fmt {
 
 // The tree is built on background threads, then handed to the main thread and only changed there.
 extension Node: @unchecked Sendable {}
+extension RootNode: @unchecked Sendable {}
