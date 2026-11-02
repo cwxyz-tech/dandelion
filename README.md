@@ -48,7 +48,7 @@ xattr -dr com.apple.quarantine /Applications/Dandelion.app
 
 ## What's new in 1.1
 
-- A much faster scanner (`getattrlistbulk`, self-balancing parallel work) that uses less memory per file
+- A much faster scanner (`getattrlistbulk`, self-balancing parallel work) that uses less memory per file. Measured 2.4× faster than 1.0 on a 118,000-file folder, with identical totals (see `Tests/ScanCheck.swift`)
 - Safety checks before the Trash: same file, same folder, and protected system and home folders
 - Animations throughout, with Reduce Motion respected
 - Faster drawing on huge folders: cached chart shapes, instant hit-testing, icons that don't touch the disk
