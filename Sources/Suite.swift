@@ -44,6 +44,9 @@ enum Tool: String, CaseIterable, Identifiable {
 
     var ready: Bool { [.diskMap, .duplicates, .rules].contains(self) }
 
+    /// The tools that are actually in the app (the sidebar and the Tools menu only show these).
+    static var shipped: [Tool] { allCases.filter { $0.ready } }
+
     var blurb: String {
         switch self {
         case .diskMap: return "See what's taking up space"
@@ -106,11 +109,9 @@ struct Sidebar: View {
             get: { state.tool },
             set: { if let t = $0 { state.tool = t } })
         ) {
+            // Tools still being built stay out of the sidebar until they ship.
             Section("Tools") {
-                ForEach(Tool.allCases.filter { $0.ready }) { t in row(t).tag(t) }
-            }
-            Section("Coming soon") {
-                ForEach(Tool.allCases.filter { !$0.ready }) { t in row(t).tag(t) }
+                ForEach(Tool.shipped) { t in row(t).tag(t) }
             }
         }
         .listStyle(.sidebar)

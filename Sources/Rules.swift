@@ -12,7 +12,7 @@ import Foundation
 
 enum FileKind: String, Codable, CaseIterable, Identifiable {
     case image = "Image", video = "Video", audio = "Audio", document = "Document", archive = "Archive"
-    case installer = "Installer", screenshot = "Screenshot", code = "Code", other = "Other"
+    case installer = "Installer", app = "App", screenshot = "Screenshot", code = "Code", other = "Other"
     var id: String { rawValue }
 
     static func of(name: String) -> FileKind {
@@ -32,8 +32,10 @@ enum FileKind: String, Codable, CaseIterable, Identifiable {
             return .document
         case "zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz", "zst":
             return .archive
-        case "dmg", "pkg", "mpkg", "iso", "app":
+        case "dmg", "pkg", "mpkg", "iso":
             return .installer
+        case "app":
+            return .app   // an app you might still use, so "trash old installers" never catches it
         case "swift", "py", "js", "ts", "html", "css", "json", "c", "cpp", "h", "m", "rs", "go", "java", "sh", "rb", "php", "yml", "yaml":
             return .code
         default:
@@ -50,6 +52,7 @@ enum FileKind: String, Codable, CaseIterable, Identifiable {
         case .document: return "Documents"
         case .archive: return "Archives"
         case .installer: return "Installers"
+        case .app: return "Apps"
         case .screenshot: return "Screenshots"
         case .code: return "Code"
         case .other: return "Other"

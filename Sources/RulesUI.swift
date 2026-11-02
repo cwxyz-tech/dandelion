@@ -321,7 +321,7 @@ struct RulesView: View {
                 .contentTransition(.symbolEffect(.replace))
             VStack(alignment: .leading, spacing: 2) {
                 Text("Run rules automatically").font(.system(size: 13, weight: .semibold))
-                Text("While Dandelion is open (it can sit in the background), new files are handled a few seconds after they land, and everything gets a sweep every 15 minutes.")
+                Text("New files are handled a few seconds after they land, and everything gets a sweep every 15 minutes. Close the window and Dandelion keeps going from the menu bar.")
                     .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
