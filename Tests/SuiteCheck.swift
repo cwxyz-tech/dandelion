@@ -19,6 +19,10 @@ struct Checks {
         TimeCheck.run()
         print("== Screen Recorder zoom")
         ZoomCheck.run()
+        print("== Screenshot markup")
+        MarkupCheck.run()
+        print("== Screen Recorder export")
+        ExportCheck.run()
         let failures = ScanCheck.failures
         print(failures == 0 ? "\nAll checks passed." : "\n\(failures) check(s) failed.")
         exit(failures == 0 ? 0 : 1)

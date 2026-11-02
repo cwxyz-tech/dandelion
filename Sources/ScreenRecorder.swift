@@ -183,12 +183,6 @@ final class CaptureSession: NSObject, SCStreamOutput, SCStreamDelegate, AVCaptur
     }
 }
 
-enum RecorderError: LocalizedError {
-    case message(String)
-    var errorDescription: String? {
-        switch self { case .message(let m): return m }
-    }
-}
 
 /// Follows the mouse while recording: where the pointer is (60 times a second) and every click.
 /// Positions are stored as fractions of the recorded area, in the area's own top-left coordinates.

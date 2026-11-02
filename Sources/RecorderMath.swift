@@ -147,3 +147,10 @@ enum ZoomPlanner {
         return Viewport(cx: cx, cy: cy, scale: scale)
     }
 }
+
+enum RecorderError: LocalizedError {
+    case message(String)
+    var errorDescription: String? {
+        switch self { case .message(let m): return m }
+    }
+}
