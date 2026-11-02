@@ -1,14 +1,23 @@
 # Dandelion
 
-A free and open-source disk space visualizer for macOS, in the spirit of DaisyDisk.
+**Blow away the clutter.** A free, open-source toolkit that fixes the everyday mess on your Mac.
 
 **[Download Dandelion.dmg](https://github.com/cwxyz-tech/dandelion/releases/latest/download/Dandelion.dmg)** · [Project page](https://coleswebsite.xyz/dandelion/) · macOS 14 or later · Apple silicon and Intel
 
-Scan a disk or folder, see everything as an interactive sunburst, find what's eating your space, and clear it out.
+See what's eating your disk, clear out duplicate files, and keep folders tidy on their own. Each tool replaces a paid Mac utility, and nothing ever leaves your Mac.
+
+| Tool | What it does | Like | Status |
+| --- | --- | --- | --- |
+| **Disk Map** | Your disk as an interactive sunburst, so the big forgotten folders jump out | DaisyDisk | Ready |
+| **Duplicates** | Finds identical files and keeps just one of each | Gemini | Ready |
+| **Folder Rules** | "Trash old installers", "sort Downloads by type": folders that tidy themselves | Hazel | Ready |
+| **Screenshot** | Capture, mark up, blur and pin screenshots | CleanShot X | Coming soon |
+| **Time Tracker** | See which apps your day goes to, kept on your Mac | Timing | Coming soon |
+| **Screen Recorder** | Recordings that zoom smoothly to your clicks | Screen Studio | Coming soon |
 
 <img src="icon-1024.png" alt="Dandelion icon" width="160">
 
-## Features
+## Disk Map
 
 - **Fast scanning.** Reads each folder in batches with `getattrlistbulk` (one system call per batch of entries, instead of one `stat` per file), spread across every CPU core.
 - **Interactive sunburst.** Click a folder to dive in, click the middle to go back up, hover anything to see its size.
@@ -46,6 +55,27 @@ Open the .dmg and drag Dandelion onto Applications. Downloaded builds are ad-hoc
 xattr -dr com.apple.quarantine /Applications/Dandelion.app
 ```
 
+## Duplicates
+
+- Compares sizes first, then a fingerprint of each file's first 64 KB, then the full contents with SHA-256, hashing in parallel.
+- Hard links, symlinks and the insides of app bundles and photo libraries are never treated as duplicates.
+- Pick which copy to keep (oldest, newest, or nearest the top); it can never select every copy of a file.
+- Right before moving anything, it checks the file hasn't changed and the copy you're keeping is still there.
+
+## Folder Rules
+
+- Conditions: kind (image, video, installer, screenshot...), name, extension, how long ago it was added or changed, size. Match all or any.
+- Actions: move to a folder, sort into folders by type or by month, or move to the Trash.
+- Preview any rule before it runs. Run by hand, or automatically while Dandelion is open (new files are handled a few seconds after they land, plus a sweep every 15 minutes).
+- Only looks at files sitting directly in the folder, skips anything still downloading, never overwrites (a clash gets "name 2"), refuses system folders, and every run can be undone.
+- Rules are saved in `~/Library/Application Support/Dandelion/rules.json`, readable only by you.
+
+## What's new in 2.0
+
+- Dandelion is now a suite: Disk Map, Duplicates and Folder Rules in one sidebar, with Screenshot, Time Tracker and Screen Recorder on the way
+- New icon and a motto: blow away the clutter
+- Every engine (scanner, duplicates, rules) is checked on a real Mac on every change
+
 ## What's new in 1.1
 
 - A much faster scanner (`getattrlistbulk`, self-balancing parallel work) that uses less memory per file. Measured 2.4× faster than 1.0 on a 118,000-file folder, with identical totals (see `Tests/ScanCheck.swift`)
@@ -79,9 +109,12 @@ macOS hides some folders (Mail, Messages, Safari, other apps' containers) from e
 | `Sources/Sunburst.swift` | Laying out and drawing the chart, hit testing |
 | `Sources/Views.swift` | The screens |
 | `Sources/Safety.swift` | Checks before anything goes to the Trash |
+| `Sources/Duplicates.swift`, `Sources/DuplicatesUI.swift` | The Duplicate Finder engine and its screens |
+| `Sources/Rules.swift`, `Sources/RulesUI.swift` | The Folder Rules engine, its screens and the folder watcher |
+| `Sources/Suite.swift` | The sidebar of tools |
 | `Sources/Icons.swift` | Fast, cached file icons |
 | `Sources/App.swift` | App entry point and menus |
-| `Tests/ScanCheck.swift` | Compares the scanner with `fts` on a tricky test tree (runs in CI: `sh Tests/run.sh`) |
+| `Tests/ScanCheck.swift`, `Tests/SuiteCheck.swift` | Checks for the scanner, Duplicate Finder and Folder Rules on tricky test folders (run in CI: `sh Tests/run.sh`) |
 | `docs/` | The project page (GitHub Pages) |
 
 On the startup disk, Dandelion scans the Data volume (`/System/Volumes/Data`), which is where all your files live. Other mounted disks aren't counted, even if they're mounted inside the folder being scanned.
