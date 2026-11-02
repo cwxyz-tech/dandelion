@@ -57,7 +57,7 @@ enum Tool: String, CaseIterable, Identifiable {
 }
 
 enum Brand {
-    static let catchphrase = "Blow away the clutter."
+    static let catchphrase = "Make a wish. Clear your Mac."
 }
 
 struct SuiteView: View {

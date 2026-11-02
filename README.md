@@ -1,6 +1,6 @@
 # Dandelion
 
-**Blow away the clutter.** A free, open-source toolkit that fixes the everyday mess on your Mac.
+**Make a wish. Clear your Mac.** A free, open-source toolkit that fixes the everyday mess on your Mac.
 
 **[Download Dandelion.dmg](https://github.com/cwxyz-tech/dandelion/releases/latest/download/Dandelion.dmg)** · [Project page](https://coleswebsite.xyz/dandelion/) · macOS 14 or later · Apple silicon and Intel
 
@@ -73,7 +73,7 @@ xattr -dr com.apple.quarantine /Applications/Dandelion.app
 ## What's new in 2.0
 
 - Dandelion is now a suite: Disk Map, Duplicates and Folder Rules in one sidebar, with Screenshot, Time Tracker and Screen Recorder on the way
-- New icon and a motto: blow away the clutter
+- New icon and a motto: make a wish, clear your Mac
 - Every engine (scanner, duplicates, rules) is checked on a real Mac on every change
 
 ## What's new in 1.1
