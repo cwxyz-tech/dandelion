@@ -91,7 +91,6 @@ enum OldScanner {
     }
 }
 
-@main
 struct ScanCheck {
     static var failures = 0
 
@@ -132,7 +131,7 @@ struct ScanCheck {
         return cur
     }
 
-    static func main() {
+    static func run() {
         let fm = FileManager.default
         let base = NSTemporaryDirectory() + "dandelion-check-\(getpid())"
         try? fm.removeItem(atPath: base)
@@ -241,7 +240,6 @@ struct ScanCheck {
                      ProcessInfo.processInfo.activeProcessorCount))
         check(old.size == r.size, "1.0 and 1.1 scanners agree on the total")
 
-        print(failures == 0 ? "\nAll checks passed." : "\n\(failures) check(s) failed.")
-        exit(failures == 0 ? 0 : 1)
+        print("")
     }
 }

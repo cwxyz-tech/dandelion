@@ -4,7 +4,7 @@ name: Build
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main, dev, suite]
   pull_request:
   workflow_dispatch:
 
@@ -22,7 +22,7 @@ jobs:
           git fetch --quiet --depth 1 "https://github.com/$GITHUB_REPOSITORY.git" "$GITHUB_SHA"
           git checkout --quiet FETCH_HEAD
 
-      - name: Check the scanner
+      - name: Check the engines (scanner, duplicates, rules)
         run: sh Tests/run.sh
 
       - name: Build
