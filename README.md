@@ -62,12 +62,16 @@ xattr -dr com.apple.quarantine /Applications/Dandelion.app
 
 ## Duplicates
 
+<img src="docs/tool-duplicates.png" alt="The Duplicates tool" width="720">
+
 - Compares sizes first, then a fingerprint of each file's first 64 KB, then the full contents with SHA-256, hashing in parallel.
 - Hard links, symlinks and the insides of app bundles and photo libraries are never treated as duplicates.
 - Pick which copy to keep (oldest, newest, or nearest the top); it can never select every copy of a file.
 - Right before moving anything, it checks the file hasn't changed and the copy you're keeping is still there.
 
 ## Folder Rules
+
+<img src="docs/tool-rules.png" alt="Folder Rules with ready-made rules" width="720">
 
 - Conditions: kind (image, video, installer, app, screenshot...), name, extension, how long ago it was added or changed, size. Match all or any.
 - Actions: move to a folder, sort into folders by type or by month, or move to the Trash.
@@ -85,7 +89,7 @@ xattr -dr com.apple.quarantine /Applications/Dandelion.app
 - Saved in Pictures → Dandelion Screenshots. Optional delay of 3, 5 or 10 seconds.
 - Turn on "keep shortcuts working" and Dandelion stays in the menu bar after you close the window.
 
-<img src="docs/tool-screenshot.png" alt="The Screenshot tool" width="720">
+<img src="docs/editor.png" alt="The markup editor with an arrow, a box, a highlight, a label and a blurred area" width="720">
 
 ## Time Tracker
 
@@ -103,7 +107,7 @@ xattr -dr com.apple.quarantine /Applications/Dandelion.app
 - Export adds a background, padding, rounded corners and a shadow, **zooms smoothly toward each click** (nearby clicks share one zoom), draws a crisp, bigger cursor that glides instead of jitters, and ripples on every click. Preview any moment before exporting.
 - 720p to 4K MP4, saved in Movies → Dandelion Recordings. Raw recordings stay in Application Support until you delete them.
 
-<img src="docs/tool-recorder.png" alt="The Screen Recorder" width="720">
+<img src="docs/export-preview.png" alt="Styling a recording before export: background, padding, zoom and cursor" width="720">
 
 ### Permissions
 

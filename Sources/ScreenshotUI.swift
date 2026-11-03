@@ -169,7 +169,6 @@ struct ShotEditorView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.primary.opacity(0.06))
         }
-        .padding(.top, 28)   // room for the transparent title bar
         .sheet(isPresented: Binding(get: { editor.textPrompt != nil }, set: { if !$0 { editor.textPrompt = nil } })) {
             TextPromptSheet(editor: editor)
         }

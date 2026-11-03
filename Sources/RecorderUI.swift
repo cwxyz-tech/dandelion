@@ -508,7 +508,7 @@ struct RecSetupView: View {
                             Image(systemName: "film").foregroundStyle(Tool.recorder.tint).frame(width: 22)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(r.title).font(.system(size: 13, weight: .medium))
-                                Text("\(RecorderModel.format(r.info.duration)) · \(r.info.clicks.count) clicks\(r.info.hasAudio ? " · with sound" : "")")
+                                Text("\(RecorderModel.format(r.info.duration)) · \(r.info.clicks.count) click\(r.info.clicks.count == 1 ? "" : "s")\(r.info.hasAudio ? " · with sound" : "")")
                                     .font(.system(size: 11)).foregroundStyle(.secondary)
                             }
                             Spacer()
@@ -563,7 +563,7 @@ struct RecEditView: View {
                         .buttonStyle(.borderless)
                     Spacer()
                     if let c = model.current {
-                        Text("\(RecorderModel.format(c.info.duration)) · \(c.info.clicks.count) clicks")
+                        Text("\(RecorderModel.format(c.info.duration)) · \(c.info.clicks.count) click\(c.info.clicks.count == 1 ? "" : "s")")
                             .font(.system(size: 12)).foregroundStyle(.secondary)
                     }
                 }

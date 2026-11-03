@@ -105,10 +105,10 @@ enum ReadmeShots {
             e.move(to: b)
             e.end()
         }
-        drag(.box, 0, p(0.505, 0.15), p(0.97, 0.93))
-        drag(.arrow, 0, p(0.36, 0.62), p(0.49, 0.5))
-        drag(.highlight, 2, p(0.19, 0.205), p(0.48, 0.25))
         drag(.blur, 0, p(0.19, 0.53), p(0.48, 0.7))
+        drag(.box, 0, p(0.505, 0.15), p(0.97, 0.93))
+        drag(.highlight, 2, p(0.19, 0.205), p(0.48, 0.25))
+        drag(.arrow, 0, p(0.3, 0.74), p(0.3, 0.27))
         e.tool = .text
         e.color = 4
         e.begin(at: p(0.2, 0.75))

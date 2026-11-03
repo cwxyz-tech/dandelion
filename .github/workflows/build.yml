@@ -98,7 +98,7 @@ jobs:
             sleep 12
             for i in 1 2 3 4 5 6; do ps -o rss=,%cpu= -p $PID | awk '{printf "memory %.1f MB, cpu %s%%\n", $1/1024, $2}'; sleep 2; done
             top -l 2 -s 5 -pid $PID -stats pid,cpu,mem,threads,idlew | tail -2
-            kill $PID; wait $PID 2>/dev/null
+            kill $PID; wait $PID 2>/dev/null || true
             echo "== scanning /Applications (peak memory, total CPU time)"
             DANDELION_README_SHOTS=1 /usr/bin/time -l "$APP" --snapshot /tmp/scan.png --scan /Applications 2>&1 \
               | grep -E "maximum resident set size|real|user|sys" | head -4
