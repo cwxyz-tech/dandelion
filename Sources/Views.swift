@@ -171,6 +171,7 @@ struct VolumeCard: View {
             Spacer(minLength: 10)
             Button("Scan") { state.scan(volume) }
                 .buttonStyle(.borderedProminent)
+                .tint(Tool.diskMap.tint)
                 .controlSize(.large)
         }
         .padding(14)
