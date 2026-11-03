@@ -1,0 +1,14 @@
+== at rest (window open, nothing running), sampled after it settles
+memory 67.4 MB, cpu 0.0%
+memory 67.4 MB, cpu 0.0%
+memory 70.9 MB, cpu 9.7%
+memory 70.9 MB, cpu 0.0%
+memory 70.9 MB, cpu 0.0%
+memory 70.8 MB, cpu 0.0%
+PID   %CPU MEM #TH IDLEW
+9712  0.0  27M 4   67   
+== scanning /Applications (peak memory, total CPU time)
+       63.51 real        12.40 user        46.70 sys
+           329596928  maximum resident set size
+== app size
+9.1M	build/Dandelion.app

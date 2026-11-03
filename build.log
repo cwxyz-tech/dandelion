@@ -1,0 +1,416 @@
+== compiling for arm64
+Sources/RecorderExport.swift:307:19: warning: capture of 'vIn' with non-sendable type 'AVAssetWriterInput' in a '@Sendable' closure
+305 |         group.enter()
+306 |         vIn.requestMediaDataWhenReady(on: vQueue) {
+307 |             while vIn.isReadyForMoreMediaData {
+    |                   `- warning: capture of 'vIn' with non-sendable type 'AVAssetWriterInput' in a '@Sendable' closure
+308 |                 guard !box.failed, let sample = vOut.copyNextSampleBuffer() else {
+309 |                     vIn.markAsFinished()
+
+/Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAssetWriterInput.h:43:12: note: class 'AVAssetWriterInput' does not conform to the 'Sendable' protocol
+  41 |  */
+  42 | API_AVAILABLE(macos(10.7), ios(4.1), tvos(9.0), visionos(1.0)) API_UNAVAILABLE(watchos)
+  43 | @interface AVAssetWriterInput : NSObject
+     |            `- note: class 'AVAssetWriterInput' does not conform to the 'Sendable' protocol
+  44 | {
+  45 | @private
+
+Sources/RecorderExport.swift:8:1: warning: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'AVFoundation'
+  6 | 
+  7 | import AppKit
+  8 | import AVFoundation
+    | `- warning: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'AVFoundation'
+  9 | import CoreImage
+ 10 | import CoreMedia
+
+Sources/RecorderExport.swift:308:49: warning: capture of 'vOut' with non-sendable type 'AVAssetReaderTrackOutput' in a '@Sendable' closure
+306 |         vIn.requestMediaDataWhenReady(on: vQueue) {
+307 |             while vIn.isReadyForMoreMediaData {
+308 |                 guard !box.failed, let sample = vOut.copyNextSampleBuffer() else {
+    |                                                 `- warning: capture of 'vOut' with non-sendable type 'AVAssetReaderTrackOutput' in a '@Sendable' closure
+309 |                     vIn.markAsFinished()
+310 |                     group.leave()
+
+/Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAssetReaderOutput.h:167:12: note: class 'AVAssetReaderTrackOutput' does not conform to the 'Sendable' protocol
+165 |  */
+166 | API_AVAILABLE(macos(10.7), ios(4.1), tvos(9.0), visionos(1.0)) API_UNAVAILABLE(watchos)
+167 | @interface AVAssetReaderTrackOutput : AVAssetReaderOutput
+    |            `- note: class 'AVAssetReaderTrackOutput' does not conform to the 'Sendable' protocol
+168 | {
+169 | @private
+
+Sources/RecorderExport.swift:316:29: warning: capture of 'composer' with non-sendable type 'FrameComposer' in a '@Sendable' closure
+ 43 | /// Draws one finished frame from one raw frame. Make one per export (or per preview style); it caches
+ 44 | /// everything that doesn't change from frame to frame.
+ 45 | final class FrameComposer {
+    |             `- note: class 'FrameComposer' does not conform to the 'Sendable' protocol
+ 46 |     let style: ExportStyle
+ 47 |     let info: RecordingInfo
+    :
+314 |                 let pts = CMSampleBufferGetPresentationTimeStamp(sample)
+315 |                 let t = CMTimeGetSeconds(pts)
+316 |                 let frame = composer.compose(CIImage(cvPixelBuffer: pixels), at: t)
+    |                             `- warning: capture of 'composer' with non-sendable type 'FrameComposer' in a '@Sendable' closure
+317 |                 guard let pool = adaptor.pixelBufferPool else { box.failed = true; continue }
+318 |                 var outBuffer: CVPixelBuffer?
+
+Sources/RecorderExport.swift:317:34: warning: capture of 'adaptor' with non-sendable type 'AVAssetWriterInputPixelBufferAdaptor' in a '@Sendable' closure
+315 |                 let t = CMTimeGetSeconds(pts)
+316 |                 let frame = composer.compose(CIImage(cvPixelBuffer: pixels), at: t)
+317 |                 guard let pool = adaptor.pixelBufferPool else { box.failed = true; continue }
+    |                                  `- warning: capture of 'adaptor' with non-sendable type 'AVAssetWriterInputPixelBufferAdaptor' in a '@Sendable' closure
+318 |                 var outBuffer: CVPixelBuffer?
+319 |                 CVPixelBufferPoolCreatePixelBuffer(nil, pool, &outBuffer)
+
+/Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAssetWriterInput.h:715:12: note: class 'AVAssetWriterInputPixelBufferAdaptor' does not conform to the 'Sendable' protocol
+ 713 |  */
+ 714 | API_AVAILABLE(macos(10.7), ios(4.1), tvos(9.0), visionos(1.0)) API_UNAVAILABLE(watchos)
+ 715 | @interface AVAssetWriterInputPixelBufferAdaptor : NSObject
+     |            `- note: class 'AVAssetWriterInputPixelBufferAdaptor' does not conform to the 'Sendable' protocol
+ 716 | {
+ 717 | @private
+
+Sources/RecorderExport.swift:321:17: warning: capture of 'ctx' with non-sendable type 'CIContext' in a '@Sendable' closure
+319 |                 CVPixelBufferPoolCreatePixelBuffer(nil, pool, &outBuffer)
+320 |                 guard let target = outBuffer else { box.failed = true; continue }
+321 |                 ctx.render(frame, to: target, bounds: composer.canvas, colorSpace: space)
+    |                 `- warning: capture of 'ctx' with non-sendable type 'CIContext' in a '@Sendable' closure
+322 |                 if !adaptor.append(target, withPresentationTime: pts) { box.failed = true }
+323 |                 // report whole percents only, instead of once per frame
+
+/Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk/System/Library/Frameworks/CoreImage.framework/Headers/CIContext.h:36:12: note: class 'CIContext' does not conform to the 'Sendable' protocol
+ 34 | 
+ 35 | NS_CLASS_AVAILABLE(10_4, 5_0)
+ 36 | @interface CIContext : NSObject
+    |            `- note: class 'CIContext' does not conform to the 'Sendable' protocol
+ 37 | {
+ 38 |     void *_priv;
+
+Sources/RecorderExport.swift:9:1: warning: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'CoreImage'
+  7 | import AppKit
+  8 | import AVFoundation
+  9 | import CoreImage
+    | `- warning: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'CoreImage'
+ 10 | import CoreMedia
+ 11 | 
+
+Sources/RecorderExport.swift:331:23: warning: capture of 'aIn' with non-sendable type 'AVAssetWriterInput' in a '@Sendable' closure
+329 |             group.enter()
+330 |             aIn.requestMediaDataWhenReady(on: aQueue) {
+331 |                 while aIn.isReadyForMoreMediaData {
+    |                       `- warning: capture of 'aIn' with non-sendable type 'AVAssetWriterInput' in a '@Sendable' closure
+332 |                     guard !box.failed, let sample = aOut.copyNextSampleBuffer() else {
+333 |                         aIn.markAsFinished()
+
+/Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAssetWriterInput.h:43:12: note: class 'AVAssetWriterInput' does not conform to the 'Sendable' protocol
+  41 |  */
+  42 | API_AVAILABLE(macos(10.7), ios(4.1), tvos(9.0), visionos(1.0)) API_UNAVAILABLE(watchos)
+  43 | @interface AVAssetWriterInput : NSObject
+     |            `- note: class 'AVAssetWriterInput' does not conform to the 'Sendable' protocol
+  44 | {
+  45 | @private
+
+Sources/RecorderExport.swift:332:53: warning: capture of 'aOut' with non-sendable type 'AVAssetReaderTrackOutput' in a '@Sendable' closure
+330 |             aIn.requestMediaDataWhenReady(on: aQueue) {
+331 |                 while aIn.isReadyForMoreMediaData {
+332 |                     guard !box.failed, let sample = aOut.copyNextSampleBuffer() else {
+    |                                                     `- warning: capture of 'aOut' with non-sendable type 'AVAssetReaderTrackOutput' in a '@Sendable' closure
+333 |                         aIn.markAsFinished()
+334 |                         group.leave()
+
+/Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAssetReaderOutput.h:167:12: note: class 'AVAssetReaderTrackOutput' does not conform to the 'Sendable' protocol
+165 |  */
+166 | API_AVAILABLE(macos(10.7), ios(4.1), tvos(9.0), visionos(1.0)) API_UNAVAILABLE(watchos)
+167 | @interface AVAssetReaderTrackOutput : AVAssetReaderOutput
+    |            `- note: class 'AVAssetReaderTrackOutput' does not conform to the 'Sendable' protocol
+168 | {
+169 | @private
+
+Sources/ScreenRecorder.swift:112:36: warning: capture of 'self' with non-sendable type 'CaptureSession' in a '@Sendable' closure
+ 14 | 
+ 15 | /// Writes ScreenCaptureKit frames (and microphone audio) into a movie file. Callbacks arrive on one serial queue.
+ 16 | final class CaptureSession: NSObject, SCStreamOutput, SCStreamDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
+    |             `- note: class 'CaptureSession' does not conform to the 'Sendable' protocol
+ 17 |     let url: URL
+ 18 |     let pixelSize: CGSize
+    :
+110 |         return await withCheckedContinuation { (cont: CheckedContinuation<Double, Never>) in
+111 |             queue.async {
+112 |                 guard let writer = self.writer, self.started else {
+    |                                    `- warning: capture of 'self' with non-sendable type 'CaptureSession' in a '@Sendable' closure
+113 |                     self.writer?.cancelWriting()
+114 |                     cont.resume(returning: 0)
+
+Sources/Screenshot.swift:239:25: warning: conformance of 'NSImage' to 'Sendable' is unavailable; this is an error in the Swift 6 language mode
+237 |         if let hit = cachedThumbnail(url) { return hit }
+238 |         let key = thumbKey(url)
+239 |         let img = await Task.detached(priority: .utility) { thumbnail(url, maxPixels: 480) }.value
+    |                         `- warning: conformance of 'NSImage' to 'Sendable' is unavailable; this is an error in the Swift 6 language mode
+240 |         if let img { thumbs.setObject(img, forKey: key) }
+241 |         return img
+
+:1:1: note: conformance of 'NSImage' to 'Sendable' has been explicitly marked unavailable here
+1 | @_nonSendable(_assumed)
+  | `- note: conformance of 'NSImage' to 'Sendable' has been explicitly marked unavailable here
+
+Sources/Screenshot.swift:239:30: warning: conformance of 'NSImage' to 'Sendable' is unavailable; this is an error in the Swift 6 language mode
+237 |         if let hit = cachedThumbnail(url) { return hit }
+238 |         let key = thumbKey(url)
+239 |         let img = await Task.detached(priority: .utility) { thumbnail(url, maxPixels: 480) }.value
+    |                              `- warning: conformance of 'NSImage' to 'Sendable' is unavailable; this is an error in the Swift 6 language mode
+240 |         if let img { thumbs.setObject(img, forKey: key) }
+241 |         return img
+
+:1:1: note: conformance of 'NSImage' to 'Sendable' has been explicitly marked unavailable here
+1 | @_nonSendable(_assumed)
+  | `- note: conformance of 'NSImage' to 'Sendable' has been explicitly marked unavailable here
+
+Sources/Screenshot.swift:239:94: warning: conformance of 'NSImage' to 'Sendable' is unavailable; this is an error in the Swift 6 language mode
+237 |         if let hit = cachedThumbnail(url) { return hit }
+238 |         let key = thumbKey(url)
+239 |         let img = await Task.detached(priority: .utility) { thumbnail(url, maxPixels: 480) }.value
+    |                                                                                              `- warning: conformance of 'NSImage' to 'Sendable' is unavailable; this is an error in the Swift 6 language mode
+240 |         if let img { thumbs.setObject(img, forKey: key) }
+241 |         return img
+
+:1:1: note: conformance of 'NSImage' to 'Sendable' has been explicitly marked unavailable here
+1 | @_nonSendable(_assumed)
+  | `- note: conformance of 'NSImage' to 'Sendable' has been explicitly marked unavailable here
+
+Sources/Screenshot.swift:239:25: warning: non-sendable type 'Task<NSImage?, Never>' cannot exit main actor-isolated context in call to nonisolated property 'value'; this is an error in the Swift 6 language mode
+237 |         if let hit = cachedThumbnail(url) { return hit }
+238 |         let key = thumbKey(url)
+239 |         let img = await Task.detached(priority: .utility) { thumbnail(url, maxPixels: 480) }.value
+    |                         `- warning: non-sendable type 'Task<NSImage?, Never>' cannot exit main actor-isolated context in call to nonisolated property 'value'; this is an error in the Swift 6 language mode
+240 |         if let img { thumbs.setObject(img, forKey: key) }
+241 |         return img
+
+_Concurrency.Task:2:23: note: generic struct 'Task' does not conform to the 'Sendable' protocol
+1 | @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+2 | @frozen public struct Task<Success, Failure> : Sendable where Success : Sendable, Failure : Error {
+  |                       `- note: generic struct 'Task' does not conform to the 'Sendable' protocol
+3 | }
+
+Sources/Screenshot.swift:239:94: warning: non-sendable type 'NSImage?' of nonisolated property 'value' cannot be sent to main actor-isolated context; this is an error in the Swift 6 language mode
+237 |         if let hit = cachedThumbnail(url) { return hit }
+238 |         let key = thumbKey(url)
+239 |         let img = await Task.detached(priority: .utility) { thumbnail(url, maxPixels: 480) }.value
+    |                                                                                              `- warning: non-sendable type 'NSImage?' of nonisolated property 'value' cannot be sent to main actor-isolated context; this is an error in the Swift 6 language mode
+240 |         if let img { thumbs.setObject(img, forKey: key) }
+241 |         return img
+
+Swift.Optional:1:21: note: generic enum 'Optional' does not conform to the 'Sendable' protocol
+1 | @frozen public enum Optional<Wrapped> : ~Copyable where Wrapped : ~Copyable {
+  |                     `- note: generic enum 'Optional' does not conform to the 'Sendable' protocol
+2 |     case none
+3 |     case some(Wrapped)
+== compiling for x86_64
+Sources/RecorderExport.swift:307:19: warning: capture of 'vIn' with non-sendable type 'AVAssetWriterInput' in a '@Sendable' closure
+305 |         group.enter()
+306 |         vIn.requestMediaDataWhenReady(on: vQueue) {
+307 |             while vIn.isReadyForMoreMediaData {
+    |                   `- warning: capture of 'vIn' with non-sendable type 'AVAssetWriterInput' in a '@Sendable' closure
+308 |                 guard !box.failed, let sample = vOut.copyNextSampleBuffer() else {
+309 |                     vIn.markAsFinished()
+
+/Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAssetWriterInput.h:43:12: note: class 'AVAssetWriterInput' does not conform to the 'Sendable' protocol
+  41 |  */
+  42 | API_AVAILABLE(macos(10.7), ios(4.1), tvos(9.0), visionos(1.0)) API_UNAVAILABLE(watchos)
+  43 | @interface AVAssetWriterInput : NSObject
+     |            `- note: class 'AVAssetWriterInput' does not conform to the 'Sendable' protocol
+  44 | {
+  45 | @private
+
+Sources/RecorderExport.swift:8:1: warning: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'AVFoundation'
+  6 | 
+  7 | import AppKit
+  8 | import AVFoundation
+    | `- warning: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'AVFoundation'
+  9 | import CoreImage
+ 10 | import CoreMedia
+
+Sources/RecorderExport.swift:308:49: warning: capture of 'vOut' with non-sendable type 'AVAssetReaderTrackOutput' in a '@Sendable' closure
+306 |         vIn.requestMediaDataWhenReady(on: vQueue) {
+307 |             while vIn.isReadyForMoreMediaData {
+308 |                 guard !box.failed, let sample = vOut.copyNextSampleBuffer() else {
+    |                                                 `- warning: capture of 'vOut' with non-sendable type 'AVAssetReaderTrackOutput' in a '@Sendable' closure
+309 |                     vIn.markAsFinished()
+310 |                     group.leave()
+
+/Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAssetReaderOutput.h:167:12: note: class 'AVAssetReaderTrackOutput' does not conform to the 'Sendable' protocol
+165 |  */
+166 | API_AVAILABLE(macos(10.7), ios(4.1), tvos(9.0), visionos(1.0)) API_UNAVAILABLE(watchos)
+167 | @interface AVAssetReaderTrackOutput : AVAssetReaderOutput
+    |            `- note: class 'AVAssetReaderTrackOutput' does not conform to the 'Sendable' protocol
+168 | {
+169 | @private
+
+Sources/RecorderExport.swift:316:29: warning: capture of 'composer' with non-sendable type 'FrameComposer' in a '@Sendable' closure
+ 43 | /// Draws one finished frame from one raw frame. Make one per export (or per preview style); it caches
+ 44 | /// everything that doesn't change from frame to frame.
+ 45 | final class FrameComposer {
+    |             `- note: class 'FrameComposer' does not conform to the 'Sendable' protocol
+ 46 |     let style: ExportStyle
+ 47 |     let info: RecordingInfo
+    :
+314 |                 let pts = CMSampleBufferGetPresentationTimeStamp(sample)
+315 |                 let t = CMTimeGetSeconds(pts)
+316 |                 let frame = composer.compose(CIImage(cvPixelBuffer: pixels), at: t)
+    |                             `- warning: capture of 'composer' with non-sendable type 'FrameComposer' in a '@Sendable' closure
+317 |                 guard let pool = adaptor.pixelBufferPool else { box.failed = true; continue }
+318 |                 var outBuffer: CVPixelBuffer?
+
+Sources/RecorderExport.swift:317:34: warning: capture of 'adaptor' with non-sendable type 'AVAssetWriterInputPixelBufferAdaptor' in a '@Sendable' closure
+315 |                 let t = CMTimeGetSeconds(pts)
+316 |                 let frame = composer.compose(CIImage(cvPixelBuffer: pixels), at: t)
+317 |                 guard let pool = adaptor.pixelBufferPool else { box.failed = true; continue }
+    |                                  `- warning: capture of 'adaptor' with non-sendable type 'AVAssetWriterInputPixelBufferAdaptor' in a '@Sendable' closure
+318 |                 var outBuffer: CVPixelBuffer?
+319 |                 CVPixelBufferPoolCreatePixelBuffer(nil, pool, &outBuffer)
+
+/Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAssetWriterInput.h:715:12: note: class 'AVAssetWriterInputPixelBufferAdaptor' does not conform to the 'Sendable' protocol
+ 713 |  */
+ 714 | API_AVAILABLE(macos(10.7), ios(4.1), tvos(9.0), visionos(1.0)) API_UNAVAILABLE(watchos)
+ 715 | @interface AVAssetWriterInputPixelBufferAdaptor : NSObject
+     |            `- note: class 'AVAssetWriterInputPixelBufferAdaptor' does not conform to the 'Sendable' protocol
+ 716 | {
+ 717 | @private
+
+Sources/RecorderExport.swift:321:17: warning: capture of 'ctx' with non-sendable type 'CIContext' in a '@Sendable' closure
+319 |                 CVPixelBufferPoolCreatePixelBuffer(nil, pool, &outBuffer)
+320 |                 guard let target = outBuffer else { box.failed = true; continue }
+321 |                 ctx.render(frame, to: target, bounds: composer.canvas, colorSpace: space)
+    |                 `- warning: capture of 'ctx' with non-sendable type 'CIContext' in a '@Sendable' closure
+322 |                 if !adaptor.append(target, withPresentationTime: pts) { box.failed = true }
+323 |                 // report whole percents only, instead of once per frame
+
+/Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk/System/Library/Frameworks/CoreImage.framework/Headers/CIContext.h:36:12: note: class 'CIContext' does not conform to the 'Sendable' protocol
+ 34 | 
+ 35 | NS_CLASS_AVAILABLE(10_4, 5_0)
+ 36 | @interface CIContext : NSObject
+    |            `- note: class 'CIContext' does not conform to the 'Sendable' protocol
+ 37 | {
+ 38 |     void *_priv;
+
+Sources/RecorderExport.swift:9:1: warning: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'CoreImage'
+  7 | import AppKit
+  8 | import AVFoundation
+  9 | import CoreImage
+    | `- warning: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'CoreImage'
+ 10 | import CoreMedia
+ 11 | 
+
+Sources/RecorderExport.swift:331:23: warning: capture of 'aIn' with non-sendable type 'AVAssetWriterInput' in a '@Sendable' closure
+329 |             group.enter()
+330 |             aIn.requestMediaDataWhenReady(on: aQueue) {
+331 |                 while aIn.isReadyForMoreMediaData {
+    |                       `- warning: capture of 'aIn' with non-sendable type 'AVAssetWriterInput' in a '@Sendable' closure
+332 |                     guard !box.failed, let sample = aOut.copyNextSampleBuffer() else {
+333 |                         aIn.markAsFinished()
+
+/Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAssetWriterInput.h:43:12: note: class 'AVAssetWriterInput' does not conform to the 'Sendable' protocol
+  41 |  */
+  42 | API_AVAILABLE(macos(10.7), ios(4.1), tvos(9.0), visionos(1.0)) API_UNAVAILABLE(watchos)
+  43 | @interface AVAssetWriterInput : NSObject
+     |            `- note: class 'AVAssetWriterInput' does not conform to the 'Sendable' protocol
+  44 | {
+  45 | @private
+
+Sources/RecorderExport.swift:332:53: warning: capture of 'aOut' with non-sendable type 'AVAssetReaderTrackOutput' in a '@Sendable' closure
+330 |             aIn.requestMediaDataWhenReady(on: aQueue) {
+331 |                 while aIn.isReadyForMoreMediaData {
+332 |                     guard !box.failed, let sample = aOut.copyNextSampleBuffer() else {
+    |                                                     `- warning: capture of 'aOut' with non-sendable type 'AVAssetReaderTrackOutput' in a '@Sendable' closure
+333 |                         aIn.markAsFinished()
+334 |                         group.leave()
+
+/Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAssetReaderOutput.h:167:12: note: class 'AVAssetReaderTrackOutput' does not conform to the 'Sendable' protocol
+165 |  */
+166 | API_AVAILABLE(macos(10.7), ios(4.1), tvos(9.0), visionos(1.0)) API_UNAVAILABLE(watchos)
+167 | @interface AVAssetReaderTrackOutput : AVAssetReaderOutput
+    |            `- note: class 'AVAssetReaderTrackOutput' does not conform to the 'Sendable' protocol
+168 | {
+169 | @private
+
+Sources/ScreenRecorder.swift:112:36: warning: capture of 'self' with non-sendable type 'CaptureSession' in a '@Sendable' closure
+ 14 | 
+ 15 | /// Writes ScreenCaptureKit frames (and microphone audio) into a movie file. Callbacks arrive on one serial queue.
+ 16 | final class CaptureSession: NSObject, SCStreamOutput, SCStreamDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
+    |             `- note: class 'CaptureSession' does not conform to the 'Sendable' protocol
+ 17 |     let url: URL
+ 18 |     let pixelSize: CGSize
+    :
+110 |         return await withCheckedContinuation { (cont: CheckedContinuation<Double, Never>) in
+111 |             queue.async {
+112 |                 guard let writer = self.writer, self.started else {
+    |                                    `- warning: capture of 'self' with non-sendable type 'CaptureSession' in a '@Sendable' closure
+113 |                     self.writer?.cancelWriting()
+114 |                     cont.resume(returning: 0)
+
+Sources/Screenshot.swift:239:25: warning: conformance of 'NSImage' to 'Sendable' is unavailable; this is an error in the Swift 6 language mode
+237 |         if let hit = cachedThumbnail(url) { return hit }
+238 |         let key = thumbKey(url)
+239 |         let img = await Task.detached(priority: .utility) { thumbnail(url, maxPixels: 480) }.value
+    |                         `- warning: conformance of 'NSImage' to 'Sendable' is unavailable; this is an error in the Swift 6 language mode
+240 |         if let img { thumbs.setObject(img, forKey: key) }
+241 |         return img
+
+:1:1: note: conformance of 'NSImage' to 'Sendable' has been explicitly marked unavailable here
+1 | @_nonSendable(_assumed)
+  | `- note: conformance of 'NSImage' to 'Sendable' has been explicitly marked unavailable here
+
+Sources/Screenshot.swift:239:30: warning: conformance of 'NSImage' to 'Sendable' is unavailable; this is an error in the Swift 6 language mode
+237 |         if let hit = cachedThumbnail(url) { return hit }
+238 |         let key = thumbKey(url)
+239 |         let img = await Task.detached(priority: .utility) { thumbnail(url, maxPixels: 480) }.value
+    |                              `- warning: conformance of 'NSImage' to 'Sendable' is unavailable; this is an error in the Swift 6 language mode
+240 |         if let img { thumbs.setObject(img, forKey: key) }
+241 |         return img
+
+:1:1: note: conformance of 'NSImage' to 'Sendable' has been explicitly marked unavailable here
+1 | @_nonSendable(_assumed)
+  | `- note: conformance of 'NSImage' to 'Sendable' has been explicitly marked unavailable here
+
+Sources/Screenshot.swift:239:94: warning: conformance of 'NSImage' to 'Sendable' is unavailable; this is an error in the Swift 6 language mode
+237 |         if let hit = cachedThumbnail(url) { return hit }
+238 |         let key = thumbKey(url)
+239 |         let img = await Task.detached(priority: .utility) { thumbnail(url, maxPixels: 480) }.value
+    |                                                                                              `- warning: conformance of 'NSImage' to 'Sendable' is unavailable; this is an error in the Swift 6 language mode
+240 |         if let img { thumbs.setObject(img, forKey: key) }
+241 |         return img
+
+:1:1: note: conformance of 'NSImage' to 'Sendable' has been explicitly marked unavailable here
+1 | @_nonSendable(_assumed)
+  | `- note: conformance of 'NSImage' to 'Sendable' has been explicitly marked unavailable here
+
+Sources/Screenshot.swift:239:25: warning: non-sendable type 'Task<NSImage?, Never>' cannot exit main actor-isolated context in call to nonisolated property 'value'; this is an error in the Swift 6 language mode
+237 |         if let hit = cachedThumbnail(url) { return hit }
+238 |         let key = thumbKey(url)
+239 |         let img = await Task.detached(priority: .utility) { thumbnail(url, maxPixels: 480) }.value
+    |                         `- warning: non-sendable type 'Task<NSImage?, Never>' cannot exit main actor-isolated context in call to nonisolated property 'value'; this is an error in the Swift 6 language mode
+240 |         if let img { thumbs.setObject(img, forKey: key) }
+241 |         return img
+
+_Concurrency.Task:2:23: note: generic struct 'Task' does not conform to the 'Sendable' protocol
+1 | @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+2 | @frozen public struct Task<Success, Failure> : Sendable where Success : Sendable, Failure : Error {
+  |                       `- note: generic struct 'Task' does not conform to the 'Sendable' protocol
+3 | }
+
+Sources/Screenshot.swift:239:94: warning: non-sendable type 'NSImage?' of nonisolated property 'value' cannot be sent to main actor-isolated context; this is an error in the Swift 6 language mode
+237 |         if let hit = cachedThumbnail(url) { return hit }
+238 |         let key = thumbKey(url)
+239 |         let img = await Task.detached(priority: .utility) { thumbnail(url, maxPixels: 480) }.value
+    |                                                                                              `- warning: non-sendable type 'NSImage?' of nonisolated property 'value' cannot be sent to main actor-isolated context; this is an error in the Swift 6 language mode
+240 |         if let img { thumbs.setObject(img, forKey: key) }
+241 |         return img
+
+Swift.Optional:1:21: note: generic enum 'Optional' does not conform to the 'Sendable' protocol
+1 | @frozen public enum Optional<Wrapped> : ~Copyable where Wrapped : ~Copyable {
+  |                     `- note: generic enum 'Optional' does not conform to the 'Sendable' protocol
+2 |     case none
+3 |     case some(Wrapped)
+build/Dandelion.app: replacing existing signature
+
+Built build/Dandelion.app
+Drag it into your Applications folder, or run:  open "build/Dandelion.app"

@@ -1,0 +1,256 @@
+Sources/RecorderExport.swift:307:19: warning: capture of 'vIn' with non-sendable type 'AVAssetWriterInput' in a '@Sendable' closure
+305 |         group.enter()
+306 |         vIn.requestMediaDataWhenReady(on: vQueue) {
+307 |             while vIn.isReadyForMoreMediaData {
+    |                   `- warning: capture of 'vIn' with non-sendable type 'AVAssetWriterInput' in a '@Sendable' closure
+308 |                 guard !box.failed, let sample = vOut.copyNextSampleBuffer() else {
+309 |                     vIn.markAsFinished()
+
+/Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAssetWriterInput.h:43:12: note: class 'AVAssetWriterInput' does not conform to the 'Sendable' protocol
+  41 |  */
+  42 | API_AVAILABLE(macos(10.7), ios(4.1), tvos(9.0), visionos(1.0)) API_UNAVAILABLE(watchos)
+  43 | @interface AVAssetWriterInput : NSObject
+     |            `- note: class 'AVAssetWriterInput' does not conform to the 'Sendable' protocol
+  44 | {
+  45 | @private
+
+Sources/RecorderExport.swift:8:1: warning: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'AVFoundation'
+  6 | 
+  7 | import AppKit
+  8 | import AVFoundation
+    | `- warning: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'AVFoundation'
+  9 | import CoreImage
+ 10 | import CoreMedia
+
+Sources/RecorderExport.swift:308:49: warning: capture of 'vOut' with non-sendable type 'AVAssetReaderTrackOutput' in a '@Sendable' closure
+306 |         vIn.requestMediaDataWhenReady(on: vQueue) {
+307 |             while vIn.isReadyForMoreMediaData {
+308 |                 guard !box.failed, let sample = vOut.copyNextSampleBuffer() else {
+    |                                                 `- warning: capture of 'vOut' with non-sendable type 'AVAssetReaderTrackOutput' in a '@Sendable' closure
+309 |                     vIn.markAsFinished()
+310 |                     group.leave()
+
+/Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAssetReaderOutput.h:167:12: note: class 'AVAssetReaderTrackOutput' does not conform to the 'Sendable' protocol
+165 |  */
+166 | API_AVAILABLE(macos(10.7), ios(4.1), tvos(9.0), visionos(1.0)) API_UNAVAILABLE(watchos)
+167 | @interface AVAssetReaderTrackOutput : AVAssetReaderOutput
+    |            `- note: class 'AVAssetReaderTrackOutput' does not conform to the 'Sendable' protocol
+168 | {
+169 | @private
+
+Sources/RecorderExport.swift:316:29: warning: capture of 'composer' with non-sendable type 'FrameComposer' in a '@Sendable' closure
+ 43 | /// Draws one finished frame from one raw frame. Make one per export (or per preview style); it caches
+ 44 | /// everything that doesn't change from frame to frame.
+ 45 | final class FrameComposer {
+    |             `- note: class 'FrameComposer' does not conform to the 'Sendable' protocol
+ 46 |     let style: ExportStyle
+ 47 |     let info: RecordingInfo
+    :
+314 |                 let pts = CMSampleBufferGetPresentationTimeStamp(sample)
+315 |                 let t = CMTimeGetSeconds(pts)
+316 |                 let frame = composer.compose(CIImage(cvPixelBuffer: pixels), at: t)
+    |                             `- warning: capture of 'composer' with non-sendable type 'FrameComposer' in a '@Sendable' closure
+317 |                 guard let pool = adaptor.pixelBufferPool else { box.failed = true; continue }
+318 |                 var outBuffer: CVPixelBuffer?
+
+Sources/RecorderExport.swift:317:34: warning: capture of 'adaptor' with non-sendable type 'AVAssetWriterInputPixelBufferAdaptor' in a '@Sendable' closure
+315 |                 let t = CMTimeGetSeconds(pts)
+316 |                 let frame = composer.compose(CIImage(cvPixelBuffer: pixels), at: t)
+317 |                 guard let pool = adaptor.pixelBufferPool else { box.failed = true; continue }
+    |                                  `- warning: capture of 'adaptor' with non-sendable type 'AVAssetWriterInputPixelBufferAdaptor' in a '@Sendable' closure
+318 |                 var outBuffer: CVPixelBuffer?
+319 |                 CVPixelBufferPoolCreatePixelBuffer(nil, pool, &outBuffer)
+
+/Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAssetWriterInput.h:715:12: note: class 'AVAssetWriterInputPixelBufferAdaptor' does not conform to the 'Sendable' protocol
+ 713 |  */
+ 714 | API_AVAILABLE(macos(10.7), ios(4.1), tvos(9.0), visionos(1.0)) API_UNAVAILABLE(watchos)
+ 715 | @interface AVAssetWriterInputPixelBufferAdaptor : NSObject
+     |            `- note: class 'AVAssetWriterInputPixelBufferAdaptor' does not conform to the 'Sendable' protocol
+ 716 | {
+ 717 | @private
+
+Sources/RecorderExport.swift:321:17: warning: capture of 'ctx' with non-sendable type 'CIContext' in a '@Sendable' closure
+319 |                 CVPixelBufferPoolCreatePixelBuffer(nil, pool, &outBuffer)
+320 |                 guard let target = outBuffer else { box.failed = true; continue }
+321 |                 ctx.render(frame, to: target, bounds: composer.canvas, colorSpace: space)
+    |                 `- warning: capture of 'ctx' with non-sendable type 'CIContext' in a '@Sendable' closure
+322 |                 if !adaptor.append(target, withPresentationTime: pts) { box.failed = true }
+323 |                 // report whole percents only, instead of once per frame
+
+/Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk/System/Library/Frameworks/CoreImage.framework/Headers/CIContext.h:36:12: note: class 'CIContext' does not conform to the 'Sendable' protocol
+ 34 | 
+ 35 | NS_CLASS_AVAILABLE(10_4, 5_0)
+ 36 | @interface CIContext : NSObject
+    |            `- note: class 'CIContext' does not conform to the 'Sendable' protocol
+ 37 | {
+ 38 |     void *_priv;
+
+Sources/RecorderExport.swift:9:1: warning: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'CoreImage'
+  7 | import AppKit
+  8 | import AVFoundation
+  9 | import CoreImage
+    | `- warning: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'CoreImage'
+ 10 | import CoreMedia
+ 11 | 
+
+Sources/RecorderExport.swift:331:23: warning: capture of 'aIn' with non-sendable type 'AVAssetWriterInput' in a '@Sendable' closure
+329 |             group.enter()
+330 |             aIn.requestMediaDataWhenReady(on: aQueue) {
+331 |                 while aIn.isReadyForMoreMediaData {
+    |                       `- warning: capture of 'aIn' with non-sendable type 'AVAssetWriterInput' in a '@Sendable' closure
+332 |                     guard !box.failed, let sample = aOut.copyNextSampleBuffer() else {
+333 |                         aIn.markAsFinished()
+
+/Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAssetWriterInput.h:43:12: note: class 'AVAssetWriterInput' does not conform to the 'Sendable' protocol
+  41 |  */
+  42 | API_AVAILABLE(macos(10.7), ios(4.1), tvos(9.0), visionos(1.0)) API_UNAVAILABLE(watchos)
+  43 | @interface AVAssetWriterInput : NSObject
+     |            `- note: class 'AVAssetWriterInput' does not conform to the 'Sendable' protocol
+  44 | {
+  45 | @private
+
+Sources/RecorderExport.swift:332:53: warning: capture of 'aOut' with non-sendable type 'AVAssetReaderTrackOutput' in a '@Sendable' closure
+330 |             aIn.requestMediaDataWhenReady(on: aQueue) {
+331 |                 while aIn.isReadyForMoreMediaData {
+332 |                     guard !box.failed, let sample = aOut.copyNextSampleBuffer() else {
+    |                                                     `- warning: capture of 'aOut' with non-sendable type 'AVAssetReaderTrackOutput' in a '@Sendable' closure
+333 |                         aIn.markAsFinished()
+334 |                         group.leave()
+
+/Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAssetReaderOutput.h:167:12: note: class 'AVAssetReaderTrackOutput' does not conform to the 'Sendable' protocol
+165 |  */
+166 | API_AVAILABLE(macos(10.7), ios(4.1), tvos(9.0), visionos(1.0)) API_UNAVAILABLE(watchos)
+167 | @interface AVAssetReaderTrackOutput : AVAssetReaderOutput
+    |            `- note: class 'AVAssetReaderTrackOutput' does not conform to the 'Sendable' protocol
+168 | {
+169 | @private
+IOServiceMatchingfailed for: AppleM2ScalerParavirtDriver
+== Disk scanner
+tree: 6013 files, 38621184 bytes  |  fts: 6013 files, 38621184 bytes
+PASS  total size matches fts
+PASS  file count matches fts
+PASS  root uses the real path
+PASS  a folder bigger than one read batch is read completely
+PASS  deep paths are rebuilt correctly
+PASS  deep file has a size
+PASS  hard link counted once
+PASS  symlink isn't followed
+PASS  unicode names survive
+PASS  spoofing characters are made visible
+PASS  empty folder
+PASS  unreadable folder is flagged
+PASS  unreadable folder is counted as skipped
+PASS  children sorted biggest first
+PASS  getattrlistbulk and readdir agree (6000 entries)
+PASS  file IDs agree
+real (/Applications/Xcode_16.4.app): Dandelion 118196 files 4.90 GB in 2.99s | fts 118196 files 4.90 GB in 4.03s | 1.3x faster
+PASS  real folder total within 0.5% of fts (0.0000%)
+PASS  real folder file count matches fts
+PASS  the fast path was used for every folder (0 fallbacks)
+speed: 1.1 scanner 2.99s | 1.0 scanner 6.24s (2.1x) | single-thread read: getattrlistbulk 8.66s (142061 entries) vs fts 4.03s (0.5x) | cores 3
+PASS  1.0 and 1.1 scanners agree on the total
+
+== Duplicate Finder
+PASS  found exactly the two duplicate sets (2)
+PASS  three copies of the photo, nothing else in that set
+PASS  the video and its backup, not the edited copy
+PASS  hard links aren't duplicates
+PASS  symlinks are ignored
+PASS  packages are never opened up
+PASS  hidden files skipped by default
+PASS  biggest savings listed first
+PASS  reclaimable space is one copy's size
+PASS  full-file hash recorded for big files
+PASS  small files found when the minimum is lowered
+PASS  empty files are never duplicates
+PASS  hidden files included when asked
+PASS  keep-nearest-the-top picks a shallow copy
+PASS  an untouched file passes the safety check
+PASS  an edited file fails the safety check
+PASS  SHA-256 hashes are 64 hex characters
+real (/Applications/Xcode_16.4.app): 48438 files looked at, 786 compared, 5 duplicate sets, 0.3 MB reclaimable, 3.12s
+PASS  walked a real folder
+== Folder Rules
+PASS  only the old installer matches (1)
+PASS  trash action plans for the Trash
+PASS  planning doesn't touch anything
+PASS  match-any widens the rule
+PASS  skips downloads in progress, hidden files, just-changed files and folders
+PASS  sorting ran without problems
+PASS  installer sorted into Installers
+PASS  screenshot recognized and sorted
+PASS  audio sorted into Audio
+PASS  undo puts everything back
+PASS  undo reports where each file went back to
+PASS  undo leaves a replaced file alone
+PASS  added-date condition uses the date added, not the date modified
+PASS  negative sizes match nothing
+PASS  a name clash gets a new name instead of overwriting
+PASS  the existing file is untouched
+PASS  one file moved
+PASS  a file replaced after planning isn't moved
+PASS  rules can't watch system folders
+PASS  a trash rule with no conditions is refused
+PASS  a sensible rule is accepted
+PASS  rules save and load exactly
+PASS  the rules file is private to you
+PASS  ready-made rules are available
+PASS  screen recordings count as screenshots
+PASS  disk images and packages are installers
+PASS  apps are their own kind, not installers
+PASS  unique names keep counting up
+== Tree after trashing
+PASS  children start biggest first
+PASS  totals go down after trashing
+PASS  a folder that shrank moves down, so nothing big gets hidden in the small-items slice
+PASS  the biggest item is first again
+== Time Tracker
+PASS  segments follow the front app, quick flicks dropped (["Safari", "Xcode", "Mail"])
+PASS  segment lengths are right
+PASS  pausing stops counting
+PASS  a flush saves progress and carries on
+PASS  a segment over midnight is split between the two days
+PASS  saved days load back, and a segment that continues the last one is joined onto it (3)
+PASS  time files are private to you
+PASS  a day's history can be deleted
+PASS  apps are ranked by time
+PASS  time crossing an hour is shared between the hours
+PASS  durations read naturally
+PASS  Xcode is development
+PASS  unknown apps use the category they declare
+PASS  otherwise they're Other
+== Screen Recorder zoom
+PASS  clicks close together share one zoom (2)
+PASS  a zoom starts just before the click and holds after
+PASS  zooms stay inside the recording
+PASS  no zoom before the first click
+PASS  fully zoomed in the middle
+PASS  the zoom eases in without jumping back
+PASS  the cursor is interpolated between samples
+PASS  full zoom reaches the chosen amount
+PASS  the zoomed view stays inside the recording
+PASS  unzoomed shows the whole frame
+PASS  no clicks, no zoom
+== Screenshot markup
+PASS  blur makes a pixelated piece
+PASS  the saved picture keeps its full size
+PASS  the arrow is drawn in red where it should be (r: 255, g: 59, b: 48)
+PASS  the box outline is blue (r: 0, g: 122, b: 255)
+PASS  the inside of a box stays clear (r: 255, g: 255, b: 255)
+PASS  text sits on a colored label (r: 40, g: 205, b: 65)
+PASS  blurred stripes become flat grey blocks, so they can't be read (r: 187, g: 187, b: 187) (r: 187, g: 187, b: 187)
+PASS  untouched parts are unchanged
+PASS  no marks means no changes
+== Screen Recorder export
+PASS  a test recording can be made
+PASS  the export finishes (ok)
+PASS  progress reaches 100%
+PASS  a framed export is 16:9 at the chosen height ((640.0, 360.0))
+PASS  the export is as long as the recording (2.0s)
+PASS  the sound comes through
+PASS  the background is the chosen gradient (r: 244, g: 207, b: 95)
+PASS  the recording sits on top of the background
+PASS  an unframed export keeps the recording's shape ((576.0, 360.0))
+PASS  the preview matches the export
+
+All checks passed.
