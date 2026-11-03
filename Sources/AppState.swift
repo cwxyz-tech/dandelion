@@ -67,6 +67,7 @@ final class AppState: ObservableObject {
         refreshVolumes()
         checkFullDiskAccess()
         rules.start()
+        ReadmeShots.startIfAsked(self)
         // keep the disk list current when drives are plugged in, ejected or renamed
         let nc = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification, NSWorkspace.didRenameVolumeNotification] {
@@ -116,6 +117,11 @@ final class AppState: ObservableObject {
             let name = FileManager.default.displayName(atPath: url.path)
             start(path: url.path, title: name, isVolume: false)
         }
+    }
+
+    /// Scans a folder without asking (used to make the README screenshots).
+    func scanFolder(_ path: String) {
+        start(path: path, title: FileManager.default.displayName(atPath: path), isVolume: false)
     }
 
     var canRescan: Bool { lastScan != nil && phase != .scanning }

@@ -321,7 +321,7 @@ struct RulesView: View {
                 .contentTransition(.symbolEffect(.replace))
             VStack(alignment: .leading, spacing: 2) {
                 Text("Run rules automatically").font(.system(size: 13, weight: .semibold))
-                Text("While Dandelion is open (it can sit in the background), new files are handled a few seconds after they land, and everything gets a sweep every 15 minutes.")
+                Text("New files are handled a few seconds after they land, and everything gets a sweep every 15 minutes. Close the window and Dandelion keeps going from the menu bar.")
                     .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
@@ -330,7 +330,8 @@ struct RulesView: View {
                 .labelsHidden()
         }
         .padding(14)
-        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
+        .background((model.autoRun ? Tool.rules.tint.opacity(0.10) : Color.primary.opacity(0.04)), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(model.autoRun ? Tool.rules.tint.opacity(0.3) : Color.primary.opacity(0.06)))
     }
 
     private var emptyState: some View {
@@ -339,7 +340,11 @@ struct RulesView: View {
             ForEach(RulesEngine.templates(), id: \.name) { t in
                 Button { model.newRule(from: t) } label: {
                     HStack(spacing: 12) {
-                        Image(systemName: "wand.and.stars").foregroundStyle(Tool.rules.tint)
+                        Image(systemName: "wand.and.stars")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Tool.rules.tint)
+                            .frame(width: 32, height: 32)
+                            .background(Tool.rules.tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
                         VStack(alignment: .leading, spacing: 2) {
                             Text(t.name).font(.system(size: 13, weight: .semibold))
                             Text(model.summary(t)).font(.system(size: 11)).foregroundStyle(.secondary).multilineTextAlignment(.leading)
@@ -349,6 +354,7 @@ struct RulesView: View {
                     }
                     .padding(12)
                     .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.primary.opacity(0.06)))
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)

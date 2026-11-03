@@ -33,6 +33,43 @@ jobs:
           ditto -c -k --keepParent build/Dandelion.app Dandelion.zip
           sh make-dmg.sh && cp build/Dandelion.dmg Dandelion.dmg
 
+      # Pictures of the real app for the README (it scans /Applications on the build Mac, saves its own window, quits)
+      - name: Screenshots
+        continue-on-error: true
+        run: |
+          mkdir -p shots
+          APP=build/Dandelion.app/Contents/MacOS/Dandelion
+          defaults write xyz.coleswebsite.dandelion rulesAutoRun -bool false
+          perl -e "alarm 240; exec @ARGV" "$APP" --snapshot shots/screenshot-light.png --scan /Applications
+          perl -e "alarm 240; exec @ARGV" "$APP" --snapshot shots/screenshot-dark.png --scan /Applications --dark
+          for t in duplicates rules; do
+            perl -e "alarm 120; exec @ARGV" "$APP" --snapshot shots/tool-$t.png --tool $t
+            perl -e "alarm 120; exec @ARGV" "$APP" --snapshot shots/tool-$t-dark.png --tool $t --dark
+          done
+          ls -la shots
+
+      # Also kept on a "screenshots" branch, so they can be fetched with plain git
+      - name: Keep the screenshots on a branch
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls shots/*.png >/dev/null 2>&1 || exit 0
+          cd shots
+          git init --quiet -b screenshots .
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" add *.png
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit --quiet -m "Screenshots from $GITHUB_SHA"
+          git push --quiet --force "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git" screenshots
+
+      - name: Upload the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: shots/
+          if-no-files-found: ignore
+
       - name: Upload the build
         uses: actions/upload-artifact@v4
         with:
@@ -52,7 +89,7 @@ jobs:
             echo "Release $TAG already exists; nothing to publish."; exit 0
           fi
           {
-            echo "Free and open-source disk space visualizer for Mac. macOS 14 or later, Apple silicon and Intel."
+            echo "**Make a wish. Clear your Mac.** A free, open-source toolkit for the everyday mess on your Mac: **Disk Map** (see what's eating your disk), **Duplicates** (clear out identical files) and **Folder Rules** (folders that tidy themselves). macOS 14 or later, Apple silicon and Intel. No network access, no analytics, no accounts."
             echo ""
             echo "**Install:** open \`Dandelion.dmg\` and drag Dandelion onto Applications."
             echo ""

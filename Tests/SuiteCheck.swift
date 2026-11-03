@@ -213,6 +213,8 @@ enum RulesCheck {
         check(stat(store.path, &st) == 0 && (st.st_mode & 0o777) == 0o600, "the rules file is private to you")
         check(RulesEngine.templates(home: base).count == 3, "ready-made rules are available")
         check(FileKind.of(name: "Screen Recording 2026-01-01 at 1.00.00 PM.mov") == .screenshot, "screen recordings count as screenshots")
+        check(FileKind.of(name: "Setup.dmg") == .installer && FileKind.of(name: "Thing.pkg") == .installer, "disk images and packages are installers")
+        check(FileKind.of(name: "Some App.app") == .app, "apps are their own kind, not installers")
         check(RulesEngine.uniquePath(base + "/Archive/notes.txt").hasSuffix("notes 3.txt"), "unique names keep counting up")
 
         try? FileManager.default.removeItem(atPath: base)

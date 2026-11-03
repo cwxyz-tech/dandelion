@@ -350,6 +350,7 @@ struct DupSetupView: View {
                 Label("Find Duplicates", systemImage: "sparkle.magnifyingglass").padding(.horizontal, 10)
             }
             .buttonStyle(.borderedProminent)
+            .tint(Tool.duplicates.tint)
             .controlSize(.large)
             .disabled(model.folders.isEmpty)
             .keyboardShortcut(.defaultAction)
