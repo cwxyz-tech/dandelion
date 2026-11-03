@@ -74,6 +74,10 @@ xattr -dr com.apple.quarantine /Applications/Dandelion.app
 - Only looks at files sitting directly in the folder, skips anything still downloading, never overwrites (a clash gets "name 2"), refuses system folders, and every run can be undone.
 - Rules are saved in `~/Library/Application Support/Dandelion/rules.json`, readable only by you.
 
+## What's new in 2.1.1
+
+- A new app icon
+
 ## What's new in 2.1
 
 - Dandelion is focused on three tools: Disk Map, Duplicates and Folder Rules
