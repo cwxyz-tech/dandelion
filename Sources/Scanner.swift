@@ -77,16 +77,11 @@ enum Scanner {
     struct Entry {
         var name: String
         var isDir: Bool
-        /// A plain file (not a link, device or anything else).
-        var isFile: Bool
         var isMountPoint: Bool
         var dev: dev_t
         var fileID: UInt64
         var links: UInt32
-        /// Space used on disk.
         var size: Int64
-        /// The file's actual length in bytes (what duplicates are compared by).
-        var length: Int64
     }
 
     private struct Job {
@@ -161,9 +156,7 @@ enum Scanner {
         static let dirMountStatus: UInt32 = 0x0000_0004
         static let fileLinkCount: UInt32 = 0x0000_0001
         static let fileAllocSize: UInt32 = 0x0000_0004
-        static let fileDataLength: UInt32 = 0x0000_0200
         static let typeDirectory: UInt32 = 2   // VDIR
-        static let typeRegular: UInt32 = 1     // VREG
         static let mountPointFlag: UInt32 = 0x1 // DIR_MNTSTATUS_MNTPOINT
     }
 
@@ -343,7 +336,7 @@ enum Scanner {
         al.bitmapcount = u_short(ATTR_BIT_MAP_COUNT)
         al.commonattr = A.cmnReturnedAttrs | A.cmnName | A.cmnDevID | A.cmnObjType | A.cmnFileID
         al.dirattr = A.dirMountStatus
-        al.fileattr = A.fileLinkCount | A.fileAllocSize | A.fileDataLength
+        al.fileattr = A.fileLinkCount | A.fileAllocSize
 
         while true {
             let count = getattrlistbulk(fd, &al, buf, bufferSize, 0)
@@ -399,15 +392,10 @@ enum Scanner {
                 if rFile & A.fileAllocSize != 0, off + 8 <= length {
                     size = p.loadUnaligned(fromByteOffset: off, as: Int64.self); off += 8
                 }
-                var dataLength: Int64 = 0
-                if rFile & A.fileDataLength != 0, off + 8 <= length {
-                    dataLength = p.loadUnaligned(fromByteOffset: off, as: Int64.self); off += 8
-                }
                 if let name = name, name != ".", name != ".." {
                     let isDir = type == A.typeDirectory
-                    out.append(Entry(name: name, isDir: isDir, isFile: type == A.typeRegular, isMountPoint: mountPoint, dev: dev,
-                                     fileID: fileID, links: links, size: isDir ? 0 : max(0, size),
-                                     length: isDir ? 0 : max(0, dataLength)))
+                    out.append(Entry(name: name, isDir: isDir, isMountPoint: mountPoint, dev: dev,
+                                     fileID: fileID, links: links, size: isDir ? 0 : max(0, size)))
                 }
                 p += length
             }
@@ -435,11 +423,9 @@ enum Scanner {
             if name == "." || name == ".." { continue }
             guard fstatat(fd, name, &st, AT_SYMLINK_NOFOLLOW) == 0 else { continue }
             let isDir = (Int(st.st_mode) & 0o170000) == 0o040000
-            let isFile = (Int(st.st_mode) & 0o170000) == 0o100000
-            out.append(Entry(name: name, isDir: isDir, isFile: isFile, isMountPoint: false, dev: st.st_dev,
+            out.append(Entry(name: name, isDir: isDir, isMountPoint: false, dev: st.st_dev,
                              fileID: UInt64(st.st_ino), links: UInt32(st.st_nlink),
-                             size: isDir ? 0 : Int64(st.st_blocks) * 512,
-                             length: isDir ? 0 : Int64(st.st_size)))
+                             size: isDir ? 0 : Int64(st.st_blocks) * 512))
         }
         return true
     }

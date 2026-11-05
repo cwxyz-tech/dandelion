@@ -30,7 +30,6 @@ struct Toast: Identifiable, Equatable {
 final class AppState: ObservableObject {
     enum Phase { case home, scanning, results }
 
-    @Published var tool: Tool = .diskMap
     @Published var phase: Phase = .home
     @Published var volumes: [VolumeInfo] = []
     @Published var root: RootNode?
@@ -50,9 +49,7 @@ final class AppState: ObservableObject {
     @Published var alertMessage: String?
 
     let hover = HoverModel()
-    let duplicates = DuplicatesModel()
-    let rules = RulesModel()
-    let appVersion = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "2.0"
+    let appVersion = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "1.1"
     var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
 
     private var progress: ScanProgress?
@@ -62,12 +59,8 @@ final class AppState: ObservableObject {
     private var observers: [NSObjectProtocol] = []
 
     init() {
-        duplicates.app = self
-        rules.app = self
         refreshVolumes()
         checkFullDiskAccess()
-        rules.start()
-        ReadmeShots.startIfAsked(self)
         // keep the disk list current when drives are plugged in, ejected or renamed
         let nc = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification, NSWorkspace.didRenameVolumeNotification] {
@@ -117,11 +110,6 @@ final class AppState: ObservableObject {
             let name = FileManager.default.displayName(atPath: url.path)
             start(path: url.path, title: name, isVolume: false)
         }
-    }
-
-    /// Scans a folder without asking (used to make the README screenshots).
-    func scanFolder(_ path: String) {
-        start(path: path, title: FileManager.default.displayName(atPath: path), isVolume: false)
     }
 
     var canRescan: Bool { lastScan != nil && phase != .scanning }

@@ -11,12 +11,7 @@ enum Safety {
     static func protectionReason(_ node: Node) -> String? {
         if node.isSynthetic { return "Hidden space isn't a real file, so there's nothing to remove." }
         if node.isRoot { return "That's the folder you scanned. Pick things inside it instead." }
-        return protectionReason(path: node.path, title: node.title)
-    }
-
-    /// The same rules for any path (used by the Duplicate Finder and Folder Rules).
-    static func protectionReason(path: String, title: String) -> String? {
-        let p = logicalPath(path)
+        let p = logicalPath(node.path)
         let home = logicalPath(NSHomeDirectory())
 
         let exact: Set<String> = [
@@ -28,13 +23,13 @@ enum Safety {
             home + "/Library/Application Support", home + "/Library/Preferences", home + "/Library/Containers",
             home + "/Library/Group Containers", home + "/Library/Mobile Documents", home + "/Library/Keychains",
         ]
-        if exact.contains(p) { return "macOS needs \u{201C}\(title)\u{201D} itself. You can remove things inside it, though." }
+        if exact.contains(p) { return "macOS needs \u{201C}\(node.title)\u{201D} itself. You can remove things inside it, though." }
 
         let inside = ["/System/", "/bin/", "/sbin/", "/usr/bin/", "/usr/lib/", "/usr/libexec/", "/usr/sbin/", "/usr/share/",
                       "/private/var/db/", "/private/var/vm/", "/private/etc/", "/dev/", "/Library/Apple/",
                       home + "/Library/Keychains/"]
         if inside.contains(where: { p.hasPrefix($0) }) {
-            return "\u{201C}\(title)\u{201D} is part of macOS. Removing it could stop your Mac from working, so Dandelion won't."
+            return "\u{201C}\(node.title)\u{201D} is part of macOS. Removing it could stop your Mac from working, so Dandelion won't."
         }
         // someone's whole home folder
         let parts = p.split(separator: "/")

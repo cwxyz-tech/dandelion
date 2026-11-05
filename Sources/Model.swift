@@ -126,12 +126,6 @@ class Node: Identifiable, Hashable {
         while let n = cur {
             n.size -= size
             n.fileCount &-= fileCount
-            // a folder that shrank may now be smaller than siblings after it; keep biggest first,
-            // because the chart stops drawing at the first tiny child and lumps the rest together
-            if let up = n.parent, let i = up.children.firstIndex(where: { $0 === n }),
-               i + 1 < up.children.count, up.children[i + 1].size > n.size {
-                up.children.sort { $0.size > $1.size }
-            }
             cur = n.parent
         }
         parent = nil

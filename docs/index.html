@@ -3,490 +3,771 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dandelion for Mac</title>
-<meta name="description" content="Dandelion is a free, open-source Mac app with three tools: see what's eating your disk, clear out duplicate files, and keep folders tidy on their own. Make a wish. Clear your Mac.">
+<title>Dandelion: free, open-source disk space visualizer for Mac</title>
+<meta name="description" content="See what's filling up your Mac and clear it out. Dandelion is a free and open-source disk space visualizer for macOS, in the spirit of DaisyDisk.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Dandelion for Mac">
-<meta property="og:description" content="Make a wish. Clear your Mac. Disk Map, Duplicates and Folder Rules in one free, open-source app.">
+<meta property="og:description" content="See what's filling up your Mac and clear it out. Free and open source.">
 <meta property="og:image" content="https://coleswebsite.xyz/dandelion/og.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#141a3a">
-<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#12162c">
 <link rel="canonical" href="https://coleswebsite.xyz/dandelion/">
 <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <style>
   :root {
-    --night: #141a3a;      /* the sky in the icon */
-    --night-2: #1e2652;
-    --seed: #f6f3ea;       /* dandelion fluff */
-    --pollen: #f5c84b;     /* the flower it was before */
-    --paper: #f5f6fa;
-    --card: #ffffff;
-    --ink: #161a2e;
-    --ink-2: #4c5168;
-    --ink-3: #7c8197;
-    --line: rgba(22, 26, 46, .10);
-    --disk: #f57a2e;       /* tool colors, same as the app */
-    --dupe: #557afa;
-    --rules: #29b373;
-    --round: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-    --sans: -apple-system, BlinkMacSystemFont, "Helvetica Neue", system-ui, sans-serif;
+    --bg: #fbf8f1; --bg2: #f3eee2; --card: #ffffff; --ink: #1b1d2b; --ink2: #545869; --ink3: #8a8d99;
+    --line: rgba(27, 29, 43, .1); --seed: #fff4d6; --accent: #e8590c; --accent-ink: #fff;
+    --night: #12162c; --code: #f1ece0; --shadow: 0 1px 2px rgba(20,20,40,.06), 0 8px 30px rgba(20,20,40,.07);
+    --radius: 18px;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --paper: #0f1330; --card: #181e44; --ink: #f1efe8; --ink-2: #b4b7cb; --ink-3: #80849d; --line: rgba(255,255,255,.09); }
+    :root {
+      --bg: #0f1224; --bg2: #151a33; --card: #1a1f3b; --ink: #f2efe6; --ink2: #b6b8c7; --ink3: #7f8299;
+      --line: rgba(255,255,255,.09); --code: #20264a; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 34px rgba(0,0,0,.35);
+      --accent: #ff8a3d; --accent-ink: #1b1000;
+    }
   }
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
-  body { margin: 0; background: var(--paper); color: var(--ink); font: 17px/1.55 var(--sans); -webkit-font-smoothing: antialiased; }
-  img { max-width: 100%; height: auto; display: block; }
-  a { color: inherit; }
-  h1, h2, h3 { font-family: var(--round); margin: 0; letter-spacing: -.022em; }
-  p { margin: 0; }
-  :focus-visible { outline: 3px solid var(--pollen); outline-offset: 3px; border-radius: 8px; }
-  .wrap { max-width: 1140px; margin: 0 auto; padding: 0 24px; }
   @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: inherit; }
+  h1, h2, h3 { font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif; letter-spacing: -.02em; line-height: 1.12; margin: 0; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 22px; }
+  section { padding: 84px 0; }
+  .eyebrow { font: 600 13px/1 -apple-system, system-ui, sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 0 0 14px; }
+  h2 { font-size: clamp(30px, 4.2vw, 44px); margin-bottom: 14px; }
+  .lede { color: var(--ink2); font-size: 19px; max-width: 640px; margin: 0; }
+  code, pre { font: 14px/1.6 ui-monospace, "SF Mono", Menlo, monospace; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
 
-  /* ---------- the night sky: nav + hero ---------- */
-  .sky { background: radial-gradient(120% 90% at 78% 30%, var(--night-2) 0%, var(--night) 62%); color: var(--seed); position: relative; overflow: hidden; }
-  nav { display: flex; align-items: center; gap: 12px; height: 68px; }
-  .brand { display: flex; align-items: center; gap: 10px; font: 700 19px var(--round); text-decoration: none; }
-  .brand img { width: 32px; height: 32px; }
-  nav .gh { margin-left: auto; font-size: 15px; color: rgba(246,243,234,.75); text-decoration: none; }
-  nav .gh:hover { color: var(--seed); }
+  /* nav */
+  nav { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px); border-bottom: 1px solid var(--line); }
+  nav .wrap { display: flex; align-items: center; gap: 22px; height: 60px; }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 700 18px ui-rounded, -apple-system, system-ui, sans-serif; }
+  .brand img { width: 30px; height: 30px; }
+  nav .links { display: flex; gap: 22px; margin-left: auto; font-size: 15px; }
+  nav .links a { text-decoration: none; color: var(--ink2); }
+  nav .links a:hover { color: var(--ink); }
+  .navbtn { font-size: 14px; font-weight: 600; text-decoration: none; padding: 7px 14px; border-radius: 999px; background: var(--ink); color: var(--bg) !important; }
+  @media (max-width: 760px) { nav .links { display: none; } .navbtn { margin-left: auto; } }
 
-  .hero { display: grid; grid-template-columns: 1.05fr 1fr; align-items: center; gap: 24px; min-height: 560px; padding: 24px 0 150px; }
-  .hero h1 { font-size: clamp(44px, 5.7vw, 78px); line-height: 1; font-weight: 800; }
-  .hero h1 span { display: block; white-space: nowrap; }
-  .hero .sub { margin-top: 26px; max-width: 30em; font-size: 20px; line-height: 1.5; color: rgba(246,243,234,.78); }
-  .cta { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; margin-top: 34px; }
-  .download { display: inline-flex; align-items: center; gap: 10px; padding: 15px 26px 15px 22px; border-radius: 999px; background: var(--seed); color: var(--night); font: 700 17px var(--round); text-decoration: none; box-shadow: 0 10px 30px rgba(0,0,0,.28); transition: transform .15s ease, box-shadow .15s ease; }
-  .download:hover { transform: translateY(-1px); box-shadow: 0 14px 34px rgba(0,0,0,.34); }
-  .download:active { transform: translateY(1px); }
-  .download svg { width: 20px; height: 20px; }
-  .req { font-size: 14px; line-height: 1.45; color: rgba(246,243,234,.6); }
+  /* hero */
+  .hero { padding: 70px 0 40px; text-align: center; position: relative; overflow: hidden; }
+  .hero::before { content: ""; position: absolute; inset: -40% -10% auto; height: 640px; background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%); pointer-events: none; }
+  .hero .icon { width: 148px; height: 148px; filter: drop-shadow(0 16px 30px rgba(20,20,60,.25)); animation: float 6s ease-in-out infinite; }
+  @keyframes float { 50% { transform: translateY(-8px) rotate(2deg); } }
+  @media (prefers-reduced-motion: reduce) { .hero .icon { animation: none; } }
+  .pill { display: inline-block; margin-top: 22px; font-size: 14px; font-weight: 600; text-decoration: none; padding: 7px 14px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+  .pill:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+  .hero h1 { font-size: clamp(40px, 7vw, 76px); margin: 22px auto 16px; max-width: 900px; }
+  .hero h1 em { font-style: normal; background: linear-gradient(90deg, #ff6b6b, #ffb238, #7bd35a, #3fc6e8, #8f6bff, #ff6bc8); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .hero .lede { margin: 0 auto; }
+  .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin: 30px 0 12px; }
+  .btn { display: inline-flex; align-items: center; gap: 9px; font: 600 17px -apple-system, system-ui, sans-serif; text-decoration: none; padding: 14px 24px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); box-shadow: var(--shadow); transition: transform .15s; }
+  .btn:hover { transform: translateY(-1px); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .btn svg { width: 20px; height: 20px; }
+  .meta { color: var(--ink3); font-size: 14px; margin: 0; }
+  .meta b { color: var(--ink2); font-weight: 600; }
 
-  .wish { position: relative; height: 520px; }
-  .wish canvas { position: absolute; inset: -60px -120px -40px -60px; width: calc(100% + 180px); height: calc(100% + 100px); cursor: pointer; }
-  .wish .hint { position: absolute; left: 63%; bottom: 22%; max-width: 160px; font-size: 14px; color: rgba(246,243,234,.55); transition: opacity .4s; pointer-events: none; }
-  .wish canvas:focus-visible { outline: none; }
-  .wish:has(canvas:focus-visible) .hint { color: var(--pollen); }
+  /* demo */
+  .demo-card { margin-top: 42px; background: var(--card); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow); overflow: hidden; text-align: left; }
+  .win-bar { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--bg2); }
+  .dots { display: flex; gap: 7px; }
+  .dots i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; }
+  .dots i:nth-child(2) { background: #febc2e; } .dots i:nth-child(3) { background: #28c840; }
+  .crumbs { display: flex; gap: 4px; align-items: center; margin-left: 10px; font-size: 13px; color: var(--ink2); overflow: hidden; white-space: nowrap; }
+  .crumbs button { all: unset; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+  .crumbs button:hover { background: var(--line); color: var(--ink); }
+  .crumbs button.here { color: var(--ink); font-weight: 600; }
+  .crumbs span { color: var(--ink3); }
+  .demo-tag { margin-left: auto; font-size: 12px; color: var(--ink3); white-space: nowrap; }
+  .demo-body { display: grid; grid-template-columns: 300px 1fr; min-height: 520px; }
+  .list { border-right: 1px solid var(--line); overflow: auto; max-height: 580px; }
+  .list-head { padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .list-head b { display: block; font-size: 15px; }
+  .list-head small { color: var(--ink3); font-size: 13px; }
+  .row { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; width: 100%; padding: 8px 16px; cursor: pointer; font-size: 14px; }
+  .row:hover, .row.lit { background: var(--line); }
+  .row.picked .nm { text-decoration: line-through; opacity: .55; }
+  .row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; gap: 8px; align-items: center; }
+  .row .nm i { flex: none; width: 10px; height: 10px; border-radius: 3px; }
+  .row .sz { color: var(--ink2); font-variant-numeric: tabular-nums; font-size: 13px; }
+  .row .bar { grid-column: 1 / -1; height: 3px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .row .bar b { display: block; height: 100%; background: var(--accent); opacity: .7; }
+  .chart { position: relative; display: flex; align-items: center; justify-content: center; padding: 18px; }
+  .chart canvas { display: block; max-width: 100%; touch-action: manipulation; cursor: pointer; }
+  .center { position: absolute; text-align: center; pointer-events: none; width: 150px; }
+  .center b { display: block; font-size: 14px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .center strong { display: block; white-space: nowrap; font: 700 26px/1.2 ui-rounded, -apple-system, system-ui, sans-serif; font-variant-numeric: tabular-nums; margin: 2px 0; }
+  .center small { color: var(--ink3); font-size: 12px; display: block; }
+  .collector { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line); background: var(--bg2); font-size: 14px; min-height: 58px; }
+  .collector .txt { color: var(--ink2); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .collector .txt b { color: var(--ink); }
+  .mini { all: unset; cursor: pointer; font-weight: 600; font-size: 13px; padding: 7px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); white-space: nowrap; }
+  .mini.danger { background: #e5484d; color: #fff; border-color: transparent; }
+  .mini[disabled] { opacity: .4; cursor: default; }
+  .hint { color: var(--ink3); font-size: 14px; margin: 14px 0 0; text-align: center; }
+  @media (max-width: 820px) {
+    .demo-body { grid-template-columns: 1fr; }
+    .list { border-right: 0; border-top: 1px solid var(--line); max-height: 300px; order: 2; }
+    .demo-tag { display: none; }
+  }
 
-  /* the app, sitting half on the sky and half on the paper */
-  .window { position: relative; margin: -120px auto 0; max-width: 1060px; border-radius: 14px; overflow: hidden; background: var(--card); box-shadow: 0 40px 90px rgba(10,14,40,.35), 0 0 0 1px rgba(0,0,0,.08); }
-  @media (prefers-color-scheme: dark) { .window { box-shadow: 0 40px 90px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.1); } }
+  /* features */
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 40px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+  .feat { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); }
+  .feat .ic { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; margin-bottom: 16px; color: #fff; }
+  .feat .ic svg { width: 24px; height: 24px; }
+  .feat h3 { font-size: 20px; margin-bottom: 6px; }
+  .feat p { margin: 0; color: var(--ink2); font-size: 15.5px; }
 
-  /* ---------- tools ---------- */
-  .tools { padding: 120px 0 40px; }
-  .intro { max-width: 640px; }
-  .intro h2 { font-size: clamp(34px, 4.4vw, 50px); line-height: 1.05; font-weight: 800; }
-  .intro p { margin-top: 16px; font-size: 19px; color: var(--ink-2); }
+  /* steps */
+  .alt { background: var(--bg2); }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 40px; counter-reset: s; }
+  @media (max-width: 800px) { .steps { grid-template-columns: 1fr; } }
+  .step { background: var(--card); border-radius: var(--radius); padding: 26px; border: 1px solid var(--line); position: relative; }
+  .step::before { counter-increment: s; content: counter(s); display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--ink); color: var(--bg); font: 700 16px ui-rounded, system-ui, sans-serif; margin-bottom: 14px; }
+  .step h3 { font-size: 19px; margin-bottom: 6px; }
+  .step p { margin: 0; color: var(--ink2); font-size: 15.5px; }
+  .note { margin-top: 22px; background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 12px; padding: 18px 20px; color: var(--ink2); font-size: 15.5px; }
+  .note b { color: var(--ink); }
+  .note code { background: var(--code); padding: 1px 6px; border-radius: 6px; font-size: 13px; }
 
-  .tool { display: grid; grid-template-columns: 360px 1fr; gap: 56px; align-items: center; padding: 88px 0; border-top: 1px solid var(--line); }
-  .tool:first-of-type { margin-top: 64px; }
-  .tool.flip { grid-template-columns: 1fr 360px; }
-  .tool.flip .text { order: 2; }
-  .tile { width: 56px; height: 56px; border-radius: 15px; display: grid; place-items: center; color: #fff; box-shadow: 0 8px 20px -6px var(--c); background: linear-gradient(var(--c), color-mix(in srgb, var(--c) 74%, white 0%)); }
-  .tile svg { width: 28px; height: 28px; }
-  .tool h3 { margin-top: 22px; font-size: 34px; font-weight: 800; }
-  .tool .what { margin-top: 10px; font-size: 19px; line-height: 1.45; color: var(--ink-2); }
-  .tool ul { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 12px; }
-  .tool li { position: relative; padding-left: 26px; font-size: 16px; color: var(--ink-2); }
-  .tool li::before { content: ""; position: absolute; left: 3px; top: .55em; width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
-  .tool li b { color: var(--ink); font-weight: 600; }
-  .instead { margin-top: 24px; font-size: 14px; color: var(--ink-3); }
-  .shot { border-radius: 12px; overflow: hidden; box-shadow: 0 24px 60px -18px rgba(10,14,40,.35), 0 0 0 1px var(--line); background: var(--card); }
+  /* split sections */
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 50px; align-items: center; }
+  .split > * { min-width: 0; }
+  @media (max-width: 860px) { .split { grid-template-columns: 1fr; gap: 30px; } }
+  .checks { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 12px; }
+  .checks li { display: flex; gap: 12px; color: var(--ink2); }
+  .checks li::before { content: ""; flex: none; width: 22px; height: 22px; margin-top: 2px; border-radius: 50%; background: #2fb26a url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 12.5l4 4 8-9'/%3E%3C/svg%3E") center/14px no-repeat; }
+  .checks b { color: var(--ink); }
+  pre { background: var(--night); color: #e9e6dc; padding: 22px 24px; border-radius: var(--radius); overflow-x: auto; margin: 0; box-shadow: var(--shadow); }
+  pre .c { color: #8a90b8; }
+  pre .p { color: #ffb238; user-select: none; }
+  .terminal { position: relative; }
+  .terminal .copy { position: absolute; top: 12px; right: 12px; all: unset; position: absolute; top: 12px; right: 12px; cursor: pointer; font: 600 12px system-ui, sans-serif; color: #c8cbe0; padding: 5px 10px; border-radius: 8px; background: rgba(255,255,255,.08); }
+  .terminal .copy:hover { background: rgba(255,255,255,.16); }
 
-  /* ---------- privacy ---------- */
-  .promise { background: var(--night); color: var(--seed); padding: 110px 0; margin-top: 60px; }
-  .promise .wrap { display: grid; grid-template-columns: 1fr 1.25fr; gap: 64px; align-items: start; }
-  .promise h2 { font-size: clamp(34px, 4.4vw, 50px); line-height: 1.05; font-weight: 800; }
-  .promise dl { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 34px 40px; }
-  .promise dt { font: 700 18px var(--round); }
-  .promise dd { margin: 6px 0 0; font-size: 15.5px; color: rgba(246,243,234,.7); }
-
-  /* ---------- install ---------- */
-  .install { padding: 110px 0 40px; }
-  .install .wrap { display: grid; grid-template-columns: 1fr 1.25fr; gap: 64px; }
-  .install h2 { font-size: clamp(34px, 4.4vw, 50px); line-height: 1.05; font-weight: 800; }
-  .install .lede { margin-top: 16px; color: var(--ink-2); font-size: 18px; }
-  ol.steps { list-style: none; counter-reset: s; padding: 0; margin: 0; display: grid; gap: 26px; }
-  ol.steps li { counter-increment: s; display: grid; grid-template-columns: 44px 1fr; gap: 16px; }
-  ol.steps li::before { content: counter(s); width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font: 700 16px var(--round); background: var(--ink); color: var(--paper); }
-  ol.steps b { font: 700 18px var(--round); display: block; margin-top: 4px; }
-  ol.steps p { margin-top: 4px; color: var(--ink-2); font-size: 16px; }
-  code { font: 14px/1.5 ui-monospace, "SF Mono", Menlo, monospace; background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 2px 6px; border-radius: 6px; overflow-wrap: anywhere; }
-
-  /* ---------- faq ---------- */
-  .faq { padding: 100px 0 60px; }
-  .faq .wrap { max-width: 780px; }
-  .faq h2 { font-size: clamp(30px, 3.6vw, 40px); font-weight: 800; margin-bottom: 18px; }
-  details { border-bottom: 1px solid var(--line); }
-  summary { cursor: pointer; list-style: none; padding: 20px 36px 20px 0; position: relative; font: 600 18px var(--round); }
+  /* faq */
+  .faq { max-width: 780px; margin-top: 36px; }
+  details { border-bottom: 1px solid var(--line); padding: 4px 0; }
+  summary { cursor: pointer; list-style: none; padding: 16px 34px 16px 0; font-weight: 600; font-size: 18px; position: relative; }
   summary::-webkit-details-marker { display: none; }
-  summary::after { content: ""; position: absolute; right: 6px; top: 50%; width: 10px; height: 10px; border-right: 2px solid var(--ink-3); border-bottom: 2px solid var(--ink-3); transform: translateY(-70%) rotate(45deg); transition: transform .2s ease; }
-  details[open] summary::after { transform: translateY(-30%) rotate(-135deg); }
-  details p { padding: 0 0 22px; color: var(--ink-2); font-size: 16px; max-width: 64ch; }
+  summary::after { content: "+"; position: absolute; right: 4px; top: 12px; font-size: 26px; font-weight: 400; color: var(--ink3); transition: transform .2s; }
+  details[open] summary::after { transform: rotate(45deg); }
+  details p { margin: 0 0 18px; color: var(--ink2); }
 
-  /* ---------- end ---------- */
-  .end { text-align: center; padding: 90px 0 110px; }
-  .end img { width: 96px; height: 96px; margin: 0 auto 22px; }
-  .end h2 { font-size: clamp(36px, 5vw, 56px); font-weight: 800; line-height: 1.02; }
-  .end .download { margin-top: 30px; background: var(--ink); color: var(--paper); }
-  .end .req { margin-top: 14px; color: var(--ink-3); }
-  footer { border-top: 1px solid var(--line); padding: 26px 0 40px; font-size: 14px; color: var(--ink-3); }
-  footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
-  footer a { color: var(--ink-2); }
+  /* download band */
+  .band { border: 1px solid rgba(255,255,255,.1); background: var(--night); color: #f2efe6; border-radius: 28px; padding: 56px 40px; text-align: center; position: relative; overflow: hidden; }
+  .band h2 { color: #fff; }
+  .band .lede { color: #b6b8c7; margin: 0 auto; }
+  .band .btn { box-shadow: none; }
+  .band .btn:not(.primary) { background: rgba(255,255,255,.08); color: #fff; border-color: rgba(255,255,255,.16); }
+  .band .meta { color: #8b8ea6; }
+  .sum { margin: 26px auto 0; max-width: 640px; font: 12px/1.5 ui-monospace, Menlo, monospace; color: #8b8ea6; word-break: break-all; }
+  .sum b { color: #c8cbe0; font-family: -apple-system, system-ui, sans-serif; font-weight: 600; }
 
-  /* ---------- smaller screens ---------- */
-  @media (max-width: 900px) {
-    .hero { grid-template-columns: 1fr; padding-bottom: 120px; min-height: 0; }
-    .wish { height: 360px; order: -1; margin-bottom: -20px; }
-    .wish canvas { inset: -30px -24px; width: calc(100% + 48px); height: calc(100% + 60px); }
-    .tool, .tool.flip { grid-template-columns: 1fr; gap: 32px; padding: 64px 0; }
-    .tool.flip .text { order: 0; }
-    .promise .wrap, .install .wrap { grid-template-columns: 1fr; gap: 40px; }
-  }
-  @media (max-width: 560px) {
-    .wrap { padding: 0 18px; }
-    .promise dl { grid-template-columns: 1fr; }
-    .hero .sub { font-size: 18px; }
-    .window { margin-top: -90px; border-radius: 10px; }
-  }
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity .6s ease, transform .6s cubic-bezier(.2,.8,.2,1); }
+  .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } }
+  footer { padding: 46px 0 60px; color: var(--ink3); font-size: 14px; }
+  footer .wrap { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+  footer a { color: var(--ink2); }
 </style>
 </head>
 <body>
 
-<div class="sky">
+<nav>
   <div class="wrap">
-    <nav>
-      <a class="brand" href="#top"><img src="icon-512.png" alt="">Dandelion</a>
-      <a class="gh" href="https://github.com/cwxyz-tech/dandelion">Source on GitHub</a>
-    </nav>
-
-    <header class="hero" id="top">
-      <div>
-        <h1><span>Make a wish.</span><span>Clear your Mac.</span></h1>
-        <p class="sub">Dandelion is a free Mac app with three tools for the mess that builds up: see what's eating your disk, clear out duplicate files, and keep folders tidy on their own.</p>
-        <div class="cta">
-          <a class="download" href="https://github.com/cwxyz-tech/dandelion/releases/latest/download/Dandelion.dmg">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14"/></svg>
-            Download for Mac
-          </a>
-          <p class="req">Free and open source<br>macOS 14 or later, Apple silicon and Intel</p>
-        </div>
-      </div>
-      <div class="wish">
-        <canvas id="wish" tabindex="0" role="button" aria-label="A dandelion. Click it, or press Enter, to blow the seeds away."></canvas>
-        <p class="hint" id="hint">Click the dandelion to make a wish</p>
-      </div>
-    </header>
+    <a class="brand" href="#top"><img src="icon-180.png" alt="" width="30" height="30">Dandelion</a>
+    <div class="links">
+      <a href="#demo">Try it</a>
+      <a href="#new">What's new</a>
+      <a href="#features">Features</a>
+      <a href="#install">Install</a>
+      <a href="#source">Source</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <a class="navbtn" href="https://github.com/cwxyz-tech/dandelion/releases/latest/download/Dandelion.dmg">Download</a>
   </div>
-</div>
+</nav>
 
-<div class="wrap">
-  <div class="window">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="screenshot-dark.png">
-      <img src="screenshot-light.png" width="2520" height="1600" alt="Dandelion's Disk Map: the Applications folder as a colorful sunburst chart, with its biggest items listed alongside">
-    </picture>
-  </div>
-</div>
-
-<main>
-  <section class="tools" id="tools">
-    <div class="wrap">
-      <div class="intro">
-        <h2>Three tools, one sidebar.</h2>
-        <p>Each one does the job of a paid Mac utility, for free. They work on your files where they are, and anything you clear goes to the Trash, so you can always change your mind.</p>
-      </div>
-
-      <article class="tool" style="--c: var(--disk)">
-        <div class="text">
-          <div class="tile"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 3.05V13h9.95A9 9 0 1 1 11 3.05Z"/><path d="M13 3.05A9 9 0 0 1 20.95 11H13V3.05Z" opacity=".8"/></svg></div>
-          <h3>Disk Map</h3>
-          <p class="what">Your whole disk as a sunburst, so the giant forgotten folders jump right out.</p>
-          <ul>
-            <li><b>Click to dive in</b>, click the middle to come back up, hover anything to see its size.</li>
-            <li><b>Collect as you go.</b> Drag files to the bar at the bottom, then send them all to the Trash at once.</li>
-            <li><b>Sizes that add up.</b> Hidden system space gets its own grey slice, and hard links count once.</li>
-            <li><b>Fast.</b> Scans in parallel across every core, reading folders in big batches.</li>
-          </ul>
-          <p class="instead">A free alternative to DaisyDisk</p>
-        </div>
-        <div class="shot">
-          <picture>
-            <source media="(prefers-color-scheme: dark)" srcset="screenshot-light.png">
-            <img src="screenshot-dark.png" loading="lazy" width="2520" height="1600" alt="Disk Map showing a folder's sunburst chart and a sorted list of its largest items">
-          </picture>
-        </div>
-      </article>
-
-      <article class="tool flip" style="--c: var(--dupe)">
-        <div class="text">
-          <div class="tile"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="3" y="3" width="13" height="13" rx="3" opacity=".75"/><rect x="8" y="8" width="13" height="13" rx="3"/></svg></div>
-          <h3>Duplicates</h3>
-          <p class="what">Finds files that are exactly the same and keeps just one of each.</p>
-          <ul>
-            <li><b>Byte for byte.</b> Checks size, then a quick fingerprint, then the full contents. Same name isn't enough.</li>
-            <li><b>You pick the keeper:</b> the oldest, the newest, or the one nearest the top.</li>
-            <li><b>Can't go wrong.</b> It never selects every copy, and it never opens up apps or photo libraries.</li>
-          </ul>
-          <p class="instead">A free alternative to Gemini</p>
-        </div>
-        <div class="shot">
-          <picture>
-            <source media="(prefers-color-scheme: dark)" srcset="tool-duplicates-dark.png">
-            <img src="tool-duplicates.png" loading="lazy" width="2520" height="1600" alt="Duplicates: choosing which folders to look in before searching">
-          </picture>
-        </div>
-      </article>
-
-      <article class="tool" style="--c: var(--rules)">
-        <div class="text">
-          <div class="tile"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h4l2 2h7A2.5 2.5 0 0 1 21 9.5v8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5v-10Z"/><path d="m8.5 13.5 2.3 2.3 4.7-4.6" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          <h3>Folder Rules</h3>
-          <p class="what">Tell a folder how to tidy itself once, and it keeps doing it.</p>
-          <ul>
-            <li><b>Ready-made rules</b> like "clear out old installers" and "sort Downloads by type".</li>
-            <li><b>Preview first</b>, then run by hand or automatically. Closed the window? It keeps going from the menu bar.</li>
-            <li><b>Safe by default.</b> Never overwrites a file, skips anything still downloading, and every run can be undone.</li>
-          </ul>
-          <p class="instead">A free alternative to Hazel</p>
-        </div>
-        <div class="shot">
-          <picture>
-            <source media="(prefers-color-scheme: dark)" srcset="tool-rules-dark.png">
-            <img src="tool-rules.png" loading="lazy" width="2520" height="1600" alt="Folder Rules with ready-made rules to start from and a switch to run them automatically">
-          </picture>
-        </div>
-      </article>
-    </div>
-  </section>
-
-  <section class="promise" id="privacy">
-    <div class="wrap">
-      <h2>Nothing ever leaves your Mac.</h2>
-      <dl>
-        <div><dt>No network at all</dt><dd>Dandelion never connects to the internet. No accounts, no analytics, no update pings.</dd></div>
-        <div><dt>Trash, not delete</dt><dd>Everything you clear goes to the Trash. Nothing is erased outright.</dd></div>
-        <div><dt>Checks before it moves</dt><dd>Right before moving a file it makes sure it's the same one it found, and it refuses to touch folders macOS needs.</dd></div>
-        <div><dt>Open source</dt><dd>Every line is on GitHub under the MIT license. Read it, build it yourself, or change it.</dd></div>
-      </dl>
-    </div>
-  </section>
-
-  <section class="install" id="install">
-    <div class="wrap">
-      <div>
-        <h2>Up and running in a minute.</h2>
-        <p class="lede">Dandelion isn't from the App Store, so macOS asks you to OK it the first time. After that it opens like any other app.</p>
-      </div>
-      <ol class="steps">
-        <li><div><b>Download and open Dandelion.dmg</b><p>Drag Dandelion onto the Applications folder.</p></div></li>
-        <li><div><b>Open it once</b><p>macOS will say it can't check the app. Click Done.</p></div></li>
-        <li><div><b>Allow it</b><p>Go to System Settings, then Privacy &amp; Security, scroll down and click Open Anyway. Or run <code>xattr -dr com.apple.quarantine /Applications/Dandelion.app</code> in Terminal.</p></div></li>
-        <li><div><b>Let it see everything (optional)</b><p>Turn on Dandelion under Privacy &amp; Security, then Full Disk Access, so Disk Map can count folders like Mail and Messages.</p></div></li>
-      </ol>
-    </div>
-  </section>
-
-  <section class="faq" id="faq">
-    <div class="wrap">
-      <h2>Questions</h2>
-      <details>
-        <summary>Is it really free?</summary>
-        <p>Yes. No trial, no subscription, no ads, no "pro" version. It's open source under the MIT license.</p>
-      </details>
-      <details>
-        <summary>Why does macOS warn me the first time?</summary>
-        <p>Apple charges developers a yearly fee to notarize apps. Dandelion is signed but not notarized, so macOS asks you to approve it once. If you'd rather not, you can build it from the source yourself with Apple's free command line tools.</p>
-      </details>
-      <details>
-        <summary>Can it break my Mac?</summary>
-        <p>It's built not to. It refuses to touch system folders and the top-level folders in your home, checks every file right before moving it, and only ever moves things to the Trash.</p>
-      </details>
-      <details>
-        <summary>Why doesn't Disk Map match what my Mac says is used?</summary>
-        <p>It does: the part a scan can't see (the sealed system volume, snapshots, purgeable caches) shows up as a grey slice so the total adds up. Turn on Full Disk Access for a fuller picture.</p>
-      </details>
-      <details>
-        <summary>Do Folder Rules run when the app is closed?</summary>
-        <p>With "Run rules automatically" on, closing the window keeps Dandelion running quietly in the menu bar so your folders stay tidy. Quit from the menu bar item to stop it.</p>
-      </details>
-      <details>
-        <summary>Which Macs does it work on?</summary>
-        <p>Any Mac running macOS 14 Sonoma or later, Apple silicon or Intel.</p>
-      </details>
-    </div>
-  </section>
-
-  <section class="end">
-    <div class="wrap">
-      <img src="icon-512.png" alt="">
-      <h2>Make a wish.<br>Clear your Mac.</h2>
-      <a class="download" href="https://github.com/cwxyz-tech/dandelion/releases/latest/download/Dandelion.dmg">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14"/></svg>
+<header class="hero" id="top">
+  <div class="wrap">
+    <img class="icon" src="icon-512.png" alt="Dandelion app icon" width="148" height="148">
+    <div><a class="pill" href="#new">New in 1.1: faster scans, safer cleanup, smoother everything →</a></div>
+    <h1>See what's <em>filling up</em> your Mac.</h1>
+    <p class="lede">Dandelion scans your disk and draws everything on it as one interactive map, so the giant forgotten folders jump right out. Then you clear them out in a couple of clicks.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/cwxyz-tech/dandelion/releases/latest/download/Dandelion.dmg">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
         Download for Mac
       </a>
-      <p class="req">Free and open source. macOS 14 or later.</p>
+      <a class="btn" href="https://github.com/cwxyz-tech/dandelion">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.93.36.31.68.92.68 1.85v2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>
+        View on GitHub
+      </a>
     </div>
-  </section>
-</main>
+    <p class="meta"><b>Version 1.1</b> · about 1 MB · macOS 14 Sonoma or later · Apple silicon and Intel · Free and open source</p>
+
+    <div class="demo-card" id="demo" aria-label="Interactive demo">
+      <div class="win-bar">
+        <div class="dots" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="crumbs" id="crumbs"></div>
+        <div class="demo-tag">Live demo · made-up files</div>
+      </div>
+      <div class="demo-body">
+        <div class="list" id="list"></div>
+        <div class="chart" id="chartBox">
+          <canvas id="chart" width="520" height="520" aria-label="Sunburst chart of a disk"></canvas>
+          <div class="center" id="center"></div>
+        </div>
+      </div>
+      <div class="collector">
+        <div class="txt" id="colTxt"></div>
+        <button class="mini" id="colClear" type="button">Clear</button>
+        <button class="mini danger" id="colTrash" type="button">Move to Trash</button>
+        <button class="mini" id="reset" type="button">Reset demo</button>
+      </div>
+    </div>
+    <p class="hint">Click a folder to go into it, and click the middle to come back out. Click a file to collect it, then send it to the Trash.</p>
+  </div>
+</header>
+
+<section id="features">
+  <div class="wrap">
+    <p class="eyebrow">Features</p>
+    <h2>Everything you need to win back space.</h2>
+    <p class="lede">The good parts of the paid disk cleaners, built into one small native app that's yours to keep, read and change.</p>
+    <div class="grid">
+      <div class="feat">
+        <div class="ic" style="background:#e8590c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 3L5 14h6l-1 7 8-11h-6l1-7z"/></svg></div>
+        <h3>Fast scanning</h3>
+        <p>Reads each folder in one go with the same fast system call Finder relies on, spread across every core of your Mac. Hundreds of gigabytes in seconds.</p>
+      </div>
+      <div class="feat">
+        <div class="ic" style="background:#8f4bff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 3a9 9 0 0 1 9 9h-4a5 5 0 0 0-5-5V3zM3 12a9 9 0 0 0 9 9v-4a5 5 0 0 1-5-5H3z"/></svg></div>
+        <h3>Interactive map</h3>
+        <p>Every ring is a folder level and every slice is its true share. Hover to see a size, click to dive in, click the middle to back out.</p>
+      </div>
+      <div class="feat">
+        <div class="ic" style="background:#2fb26a"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></div>
+        <h3>Collect, then clean</h3>
+        <p>Drag anything onto the collector at the bottom, check the total, and move it all to the Trash at once. Nothing is ever deleted outright, and every item is double-checked first.</p>
+      </div>
+      <div class="feat">
+        <div class="ic" style="background:#1c7ed6"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div>
+        <h3>Quick Look built in</h3>
+        <p>Not sure what that 4 GB file is? Press Space to peek inside before you toss it. Reveal in Finder, Open and Copy Path are one right-click away.</p>
+      </div>
+      <div class="feat">
+        <div class="ic" style="background:#868e96"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7c1.8 0 3.4-.5 4.8-1.3"/></svg></div>
+        <h3>Hidden space, explained</h3>
+        <p>The sealed system, snapshots and purgeable caches show up as one grey slice, so the map always adds up to what your disk says is used.</p>
+      </div>
+      <div class="feat">
+        <div class="ic" style="background:#d6336c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></div>
+        <h3>Truly native</h3>
+        <p>Written in Swift and SwiftUI, with smooth animations everywhere. Universal for Apple silicon and Intel, light and dark mode, about 1 MB to download.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="new">
+  <div class="wrap">
+    <p class="eyebrow">What's new in 1.1</p>
+    <h2>Faster, safer, smoother.</h2>
+    <p class="lede">A top-to-bottom tune-up. Same app, just better at everything.</p>
+    <div class="grid">
+      <div class="feat reveal">
+        <div class="ic" style="background:#e8590c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 3L5 14h6l-1 7 8-11h-6l1-7z"/></svg></div>
+        <h3>A much faster scanner</h3>
+        <p>Folders are now read in batches with one system call each instead of one per file, and idle cores take work from busy ones. In testing it scans about 2.4× faster than 1.0, with less memory per file.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="ic" style="background:#2fb26a"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <h3>Safety checks before the Trash</h3>
+        <p>Every item is checked right before it moves: still the same file, still in the same folder. Folders macOS depends on, and your home folders themselves, are protected.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="ic" style="background:#8f4bff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 3v4h-4M6 21v-4h4"/></svg></div>
+        <h3>Animations everywhere</h3>
+        <p>The map sweeps in, rings bloom as you dive into folders, slices lift as you hover, lists and cards glide in, and numbers roll as they change. Reduce Motion turns it all off.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="ic" style="background:#1c7ed6"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9h10M7 13h6"/></svg></div>
+        <h3>Snappier on huge folders</h3>
+        <p>The chart reuses its shapes between frames and finds what's under the pointer instantly, icons load without touching the disk, and freeing a big scan no longer pauses the window.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="ic" style="background:#d6336c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h10M4 17h7"/></svg></div>
+        <h3>Disguised names exposed</h3>
+        <p>File names that use invisible or direction-flipping characters to look like something else now show those characters plainly.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="ic" style="background:#868e96"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5v14"/></svg></div>
+        <h3>Little things</h3>
+        <p>Press Delete to collect the selected item, disks update the moment you plug one in, a sound and a note when things reach the Trash, and the hardened runtime is switched on.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="alt" id="install">
+  <div class="wrap">
+    <p class="eyebrow">Install</p>
+    <h2>Up and running in a minute.</h2>
+    <div class="steps">
+      <div class="step">
+        <h3>Download and drag</h3>
+        <p>Open <b>Dandelion.dmg</b> and drag Dandelion onto the Applications folder next to it.</p>
+      </div>
+      <div class="step">
+        <h3>Allow it once</h3>
+        <p>The first time, macOS says it can't check the app. Open <b>System Settings → Privacy &amp; Security</b>, scroll down and click <b>Open Anyway</b>.</p>
+      </div>
+      <div class="step">
+        <h3>Scan</h3>
+        <p>Pick your Mac's disk (or any folder) and hit <b>Scan</b>. Then go hunting for the big slices.</p>
+      </div>
+    </div>
+    <div class="note"><b>Why the warning?</b> Apple charges developers $99 a year to notarize apps. Dandelion is free, so it isn't notarized, and macOS asks you to confirm once. If you'd rather use Terminal: <code>xattr -dr com.apple.quarantine /Applications/Dandelion.app</code></div>
+    <div class="note"><b>See everything with Full Disk Access.</b> macOS hides some folders (Mail, Messages, other apps' data) from every app until you allow it. Dandelion shows a banner when that's happening: turn it on in <b>System Settings → Privacy &amp; Security → Full Disk Access</b>, then rescan.</div>
+  </div>
+</section>
+
+<section id="privacy">
+  <div class="wrap split" style="align-items:start">
+    <div>
+      <p class="eyebrow">Privacy</p>
+      <h2>Your files never leave your Mac.</h2>
+      <p class="lede">A disk scanner sees everything you own. So Dandelion is built to be boring about it.</p>
+      <ul class="checks">
+        <li><span><b>No internet at all.</b> No update checks, no analytics, no crash reports. It never opens a network connection.</span></li>
+        <li><span><b>Locked down.</b> Built with Apple's hardened runtime, so nothing can inject code into it, and it never follows a link out of the disk it's scanning.</span></li>
+        <li><span><b>No account, no subscription,</b> no upsell. It's free forever.</span></li>
+        <li><span><b>Nothing is deleted behind your back.</b> Everything you remove goes to the Trash, so you can put it back until you empty it.</span></li>
+        <li><span><b>Read every line.</b> The whole app is open source, so you don't have to take my word for any of this.</span></li>
+      </ul>
+    </div>
+    <div>
+      <p class="eyebrow">Accurate</p>
+      <h2>Sizes you can trust.</h2>
+      <ul class="checks">
+        <li><span><b>Real space on disk.</b> Counts the blocks each file actually takes up, the same as Finder's "on disk".</span></li>
+        <li><span><b>Hard links counted once,</b> so Time Machine and Xcode files don't get double counted.</span></li>
+        <li><span><b>One disk at a time.</b> Other drives mounted inside a folder aren't mixed into its total.</span></li>
+        <li><span><b>Unreadable folders flagged,</b> instead of silently left out.</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="alt" id="source">
+  <div class="wrap split">
+    <div>
+      <p class="eyebrow">Open source</p>
+      <h2>Build it yourself.</h2>
+      <p class="lede">Dandelion is MIT licensed. Fork it, change it, ship your own. Building it only needs Apple's free Command Line Tools, not the full Xcode.</p>
+      <div class="cta" style="justify-content:flex-start">
+        <a class="btn" href="https://github.com/cwxyz-tech/dandelion">Browse the code</a>
+        <a class="btn" href="https://github.com/cwxyz-tech/dandelion/blob/main/LICENSE">MIT License</a>
+      </div>
+    </div>
+    <div class="terminal">
+      <button class="copy" id="copyBtn" type="button">Copy</button>
+<pre id="buildCmds"><span class="c"># once: Apple's command line tools</span>
+<span class="p">$ </span>xcode-select --install
+
+<span class="c"># get the code and build the app</span>
+<span class="p">$ </span>git clone https://github.com/cwxyz-tech/dandelion
+<span class="p">$ </span>cd dandelion
+<span class="p">$ </span>./build.sh
+
+<span class="c"># optional: pack it into a .dmg</span>
+<span class="p">$ </span>./make-dmg.sh</pre>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <p class="eyebrow">FAQ</p>
+    <h2>Questions</h2>
+    <div class="faq">
+      <details>
+        <summary>Is it really free?</summary>
+        <p>Yes. No trial, no "pro" version, no ads. It's open source under the MIT License, so it stays free even if I stop working on it.</p>
+      </details>
+      <details>
+        <summary>Why is it called Dandelion?</summary>
+        <p>The chart looks like a flower head of seeds. Dandelions are also the plant everyone wants gone, which feels right for an app about clearing out clutter.</p>
+      </details>
+      <details>
+        <summary>What's the grey "Hidden space" slice?</summary>
+        <p>Space your disk reports as used that no app can see as files: the sealed macOS system volume, APFS snapshots (Time Machine makes these), purgeable caches the system can free on its own, and any folders Dandelion wasn't allowed to read. Giving it Full Disk Access usually shrinks this.</p>
+      </details>
+      <details>
+        <summary>Why doesn't the total match Finder exactly?</summary>
+        <p>Finder's "available" number counts purgeable space as free. Dandelion shows what's actually on disk right now, so the two can differ by a few gigabytes. Both are right; they're just answering slightly different questions.</p>
+      </details>
+      <details>
+        <summary>Is it safe to delete what it finds?</summary>
+        <p>Dandelion only moves things to the Trash, so nothing is gone until you empty it. Usually safe: your own downloads, old videos, caches, Xcode's DerivedData. Leave alone: anything inside /System or /Library you don't recognize. When in doubt, use Quick Look or search the name first.</p>
+      </details>
+      <details>
+        <summary>Does it work on my Mac?</summary>
+        <p>Any Mac on macOS 14 Sonoma or later, both Apple silicon (including the MacBook Neo) and Intel. It's a single universal app.</p>
+      </details>
+      <details>
+        <summary>How is this different from DaisyDisk?</summary>
+        <p>DaisyDisk is a great paid app and the inspiration here. Dandelion covers the core of it (scan, map, collect, trash) for free, and since the code is open you can check exactly what it does with your files.</p>
+      </details>
+      <details>
+        <summary>Can I help?</summary>
+        <p>Yes! Bug reports and ideas are welcome as GitHub issues, and pull requests are welcome too.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section style="padding-top:20px">
+  <div class="wrap">
+    <div class="band">
+      <h2>Clear out your Mac today.</h2>
+      <p class="lede">Free, open source, about 1 MB. Now in version 1.1.</p>
+      <div class="cta">
+        <a class="btn primary" href="https://github.com/cwxyz-tech/dandelion/releases/latest/download/Dandelion.dmg">Download Dandelion</a>
+        <a class="btn" href="https://github.com/cwxyz-tech/dandelion/releases">All releases</a>
+      </div>
+      <p class="meta">Version 1.1 · macOS 14 or later · Apple silicon and Intel</p>
+      <p class="sum"><b>Check your download:</b> every release lists the SHA-256 fingerprint of its files, built in the open by GitHub Actions.</p>
+    </div>
+  </div>
+</section>
 
 <footer>
   <div class="wrap">
-    <span>Dandelion is free software under the MIT license.</span>
-    <span><a href="https://github.com/cwxyz-tech/dandelion">Source</a> &nbsp; <a href="https://github.com/cwxyz-tech/dandelion/releases">All releases</a> &nbsp; <a href="https://github.com/cwxyz-tech/dandelion/issues">Report a problem</a></span>
+    <span>Dandelion · Free and open source under the MIT License</span>
+    <span><a href="https://github.com/cwxyz-tech/dandelion">GitHub</a> · <a href="https://github.com/cwxyz-tech/dandelion/issues">Report a bug</a> · <a href="https://github.com/cwxyz-tech/dandelion/releases">Releases</a></span>
   </div>
 </footer>
 
 <script>
-// The dandelion in the hero. Click it (or press Enter) and the seeds blow away; click again and it grows back.
-(() => {
-  const canvas = document.getElementById("wish");
-  const hint = document.getElementById("hint");
-  const ctx = canvas.getContext("2d");
-  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let W = 0, H = 0, dpr = 1, seeds = [], state = "full", t0 = performance.now(), blownAt = 0;
+(function () {
+  "use strict";
+  var GB = 1e9, MB = 1e6;
 
-  // a seeded random so the flower looks the same every visit
-  let r = 7;
-  const rand = () => (r = (r * 16807) % 2147483647) / 2147483647;
-
-  function head() { return { x: W * 0.5, y: H * 0.40, R: Math.min(W, H) * 0.25 }; }
-
-  function build() {
-    seeds = []; r = 7;
-    const n = 96;
-    for (let i = 0; i < n; i++) {
-      // spread evenly over a sphere, seen from the front
-      const z = 1 - (2 * (i + 0.5)) / n, ring = Math.sqrt(1 - z * z), a = i * 2.39996;
-      seeds.push({
-        dx: Math.cos(a) * ring, dy: Math.sin(a) * ring, depth: z,
-        len: 0.86 + rand() * 0.18,
-        x: 0, y: 0, vx: 0, vy: 0, rot: 0, vr: 0, sway: rand() * 6.28,
-        delay: 0, life: 1, free: false, grow: 1,
-      });
+  // ---------- the demo disk (made up) ----------
+  function files(prefix, n, ext, lo, hi, seed) {
+    var out = [], x = seed;
+    for (var i = 0; i < n; i++) {
+      x = (x * 9301 + 49297) % 233280;
+      out.push([prefix + " " + (i + 1) + ext, lo + (hi - lo) * (x / 233280)]);
     }
-    seeds.sort((a, b) => a.depth - b.depth);   // back ones first, so front ones draw on top
+    return out;
+  }
+  var DISK = ["Macintosh HD", [
+    ["Users", [["you", [
+      ["Library", [
+        ["Application Support", [["Steam", [["steamapps", 36 * GB], ["logs", 0.4 * GB]]], ["Spotify", 2.4 * GB], ["Google", 3.2 * GB], ["Discord", 1.1 * GB], ["Code", 0.9 * GB]]],
+        ["Developer", [["Xcode", [["DerivedData", 14.2 * GB], ["iOS DeviceSupport", 9.1 * GB], ["Archives", 2.2 * GB]]], ["CoreSimulator", 11.4 * GB]]],
+        ["Containers", [["Messages", 6.2 * GB], ["Mail", 3.4 * GB], ["Photos Agent", 1.2 * GB]]],
+        ["Caches", [["Homebrew", 2.9 * GB], ["Safari", 1.8 * GB], ["Yarn", 1.4 * GB], ["pip", 0.9 * GB]]],
+        ["Mobile Documents", 4.1 * GB]
+      ]],
+      ["Pictures", [["Photos Library.photoslibrary", 41 * GB], ["Screenshots", files("Screenshot", 60, ".png", 1.5 * MB, 4 * MB, 7)]]],
+      ["Movies", [["Final Cut Projects", [["Summer trip.fcpbundle", 22 * GB], ["Render Files", 8.3 * GB]]], ["Screen Recordings", 5.5 * GB]]],
+      ["Downloads", [["old-installer.dmg", 3.8 * GB], ["dataset.zip", 2.6 * GB], ["lecture-01.mov", 1.9 * GB], ["lecture-02.mov", 1.7 * GB], ["Odds and ends", files("download", 80, ".pdf", 0.5 * MB, 30 * MB, 3)]]],
+      ["Music", [["Logic", [["Projects", 7.4 * GB], ["Bounces", 1.1 * GB]]], ["Music", 3.3 * GB]]],
+      ["Documents", [["Code", [["node_modules (everywhere)", 4.6 * GB], ["side projects", 1.3 * GB]]], ["School", [["Projects", 2.2 * GB], ["Notes", 0.4 * GB]]]]],
+      ["Desktop", files("Untitled", 25, ".png", 1 * MB, 40 * MB, 11)]
+    ]]]],
+    ["Applications", [["Xcode.app", 12.5 * GB], ["Final Cut Pro.app", 6.1 * GB], ["Logic Pro.app", 3.2 * GB], ["GarageBand.app", 1.9 * GB], ["Google Chrome.app", 1.4 * GB], ["Steam.app", 0.4 * GB], ["Everything else", files("App", 40, ".app", 20 * MB, 300 * MB, 5)]]],
+    ["Library", [["Audio", [["Apple Loops", 6 * GB]]], ["Application Support", 4.5 * GB], ["Developer", [["CommandLineTools", 3.4 * GB]]], ["Caches", 1.2 * GB]]],
+    ["private", [["var", [["vm", [["sleepimage", 8 * GB], ["swapfile0", 4 * GB]]], ["folders", 2.3 * GB], ["db", 1.1 * GB]]]]],
+    ["opt", [["homebrew", 3.6 * GB]]],
+    ["Hidden space", 28 * GB, "hidden"]
+  ]];
+
+  function build(src, parent) {
+    var n = { name: src[0], parent: parent, size: 0, kids: null, hidden: src[2] === "hidden" };
+    if (Array.isArray(src[1])) {
+      n.kids = src[1].map(function (c) { return build(c, n); });
+      fix(n);
+    } else n.size = Math.round(src[1]);
+    return n;
+  }
+  function fix(n) {
+    n.size = 0;
+    n.kids.forEach(function (k) { n.size += k.size; });
+    n.kids.sort(function (a, b) { return b.size - a.size; });
+  }
+  function count(n) { return n.kids ? n.kids.reduce(function (s, k) { return s + count(k); }, 0) : (n.hidden ? 0 : 1); }
+
+  var root, focus, collected = [];
+  var canvas = document.getElementById("chart"), ctx = canvas.getContext("2d");
+  var centerEl = document.getElementById("center"), listEl = document.getElementById("list"), crumbsEl = document.getElementById("crumbs");
+  var RINGS = 5, slices = [], hoverIdx = -1, hoverCenter = false, size = 520, anim = 1;
+  var dark = matchMedia("(prefers-color-scheme: dark)");
+  var calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function fmt(b) {
+    if (b >= 1e9) return (b / 1e9).toFixed(b >= 1e11 ? 0 : 1) + " GB";
+    if (b >= 1e6) return (b / 1e6).toFixed(b >= 1e8 ? 0 : 1) + " MB";
+    if (b >= 1e3) return Math.round(b / 1e3) + " KB";
+    return b + " bytes";
+  }
+  function isCollected(n) { for (var c = n; c; c = c.parent) if (collected.indexOf(c) >= 0) return true; return false; }
+
+  function layout() {
+    slices = [];
+    (function walk(n, depth, a0, span) {
+      if (depth > RINGS || !n.kids || n.size <= 0) return;
+      var a = a0, rest = 0, restN = 0, min = 0.006 + 0.0015 * depth;
+      for (var i = 0; i < n.kids.length; i++) {
+        var c = n.kids[i], s = span * c.size / n.size;
+        if (s < min) { for (var k = i; k < n.kids.length; k++) rest += n.kids[k].size; restN = n.kids.length - i; break; }
+        slices.push({ node: c, depth: depth, a0: a, a1: a + s, hue: (a + s / 2) / (Math.PI * 2) });
+        walk(c, depth + 1, a, s);
+        a += s;
+      }
+      if (rest > 0) slices.push({ node: n, depth: depth, a0: a, a1: a + span * rest / n.size, small: true, bytes: rest, count: restN });
+    })(focus, 1, 0, Math.PI * 2);
   }
 
-  function resize() {
-    const b = canvas.getBoundingClientRect();
-    dpr = Math.min(2, devicePixelRatio || 1);
-    W = b.width; H = b.height;
-    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+  function geo() { var r = size / 2 - 6; var inner = r * 0.26; return { c: size / 2, inner: inner, ring: (r - inner) / RINGS }; }
+
+  function color(s, lit) {
+    var d = dark.matches;
+    if (s.small) return lit ? (d ? "rgba(255,255,255,.4)" : "rgba(0,0,0,.28)") : (d ? "rgba(255,255,255,.2)" : "rgba(0,0,0,.14)");
+    if (s.node.hidden) return lit ? "#a3a6b4" : "#8e91a0";
+    var dep = s.depth - 1, dir = !!s.node.kids;
+    var sat = dir ? Math.max(30, 76 - dep * 9) : 26, light = dir ? 58 + dep * 3.5 : 70;
+    if (d) light -= 4;
+    if (lit) { sat *= 0.7; light += 12; }
+    return "hsl(" + Math.round(s.hue * 360) + "," + sat + "%," + light + "%)";
+  }
+
+  function draw() {
+    var dpr = window.devicePixelRatio || 1, g = geo();
+    canvas.width = size * dpr; canvas.height = size * dpr;
+    canvas.style.width = size + "px"; canvas.style.height = size + "px";
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    if (still) draw(performance.now());
-  }
-
-  function blow() {
-    if (state === "full") {
-      const h = head();
-      state = "blowing"; blownAt = performance.now();
-      for (const s of seeds) {
-        // the wind comes from the left: seeds on the right let go first
-        s.delay = (1 - (s.dx + 1) / 2) * 700 + rand() * 500;
-        s.free = false; s.life = 1;
-        s.vx = 0.9 + rand() * 1.6 + s.dx * 0.6;
-        s.vy = -0.6 - rand() * 1.1 + s.dy * 0.4;
-        s.vr = (rand() - 0.5) * 0.02;
-        s.x = h.x + s.dx * h.R * s.len; s.y = h.y + s.dy * h.R * s.len;
-        s.rot = Math.atan2(s.dy, s.dx) + Math.PI / 2;
-      }
-      hint.textContent = "Click again to grow it back";
-    } else if (state === "bare" || state === "blowing") {
-      state = "growing"; blownAt = performance.now();
-      for (const s of seeds) { s.free = false; s.grow = 0; s.delay = rand() * 600; }
-      hint.textContent = "Click the dandelion to make a wish";
-    }
-    if (still) { state = state === "blowing" ? "bare" : "full"; for (const s of seeds) s.grow = 1; draw(performance.now()); }
-  }
-
-  // one seed: a thin stalk with a little umbrella of fluff at the end
-  function drawSeed(x, y, angle, size, alpha) {
+    ctx.clearRect(0, 0, size, size);
+    var gap = getComputedStyle(document.documentElement).getPropertyValue("--card").trim() || "#fff";
+    var k = calm ? 1 : anim;
     ctx.save();
-    ctx.translate(x, y); ctx.rotate(angle);
-    ctx.globalAlpha = alpha;
-    ctx.strokeStyle = "rgba(246,243,234,.85)"; ctx.lineWidth = 0.9;
-    ctx.beginPath(); ctx.moveTo(0, size * 0.62); ctx.lineTo(0, 0); ctx.stroke();
-    ctx.fillStyle = "#c9a34a";
-    ctx.beginPath(); ctx.ellipse(0, size * 0.66, 1.3, 3, 0, 0, 6.283); ctx.fill();   // the seed itself
-    ctx.strokeStyle = "rgba(246,243,234,.7)"; ctx.lineWidth = 0.7;
-    ctx.beginPath();
-    for (let k = -3; k <= 3; k++) {
-      const a = -Math.PI / 2 + k * 0.4;
-      ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * size * 0.38, Math.sin(a) * size * 0.38);
+    ctx.globalAlpha = 0.25 + 0.75 * k;
+    for (var i = 0; i < slices.length; i++) {
+      var s = slices[i];
+      var ri = g.inner + g.ring * (s.depth - 1) * (0.6 + 0.4 * k) + 1.5, ro = g.inner + g.ring * s.depth * (0.6 + 0.4 * k);
+      var a0 = s.a0 - Math.PI / 2, a1 = s.a1 - Math.PI / 2;
+      ctx.beginPath();
+      ctx.arc(g.c, g.c, ro, a0, a1, false);
+      ctx.arc(g.c, g.c, ri, a1, a0, true);
+      ctx.closePath();
+      var lit = i === hoverIdx || (!s.small && listHover === s.node);
+      ctx.fillStyle = color(s, lit);
+      ctx.globalAlpha = (0.25 + 0.75 * k) * (!s.small && isCollected(s.node) ? 0.3 : 1);
+      ctx.fill();
+      if (s.a1 - s.a0 > 0.012) { ctx.strokeStyle = gap; ctx.lineWidth = 1; ctx.stroke(); }
     }
-    ctx.stroke();
     ctx.restore();
+    ctx.beginPath();
+    ctx.arc(g.c, g.c, g.inner - 2, 0, Math.PI * 2);
+    ctx.fillStyle = dark.matches ? (hoverCenter && focus.parent ? "rgba(255,255,255,.12)" : "rgba(255,255,255,.05)")
+                                 : (hoverCenter && focus.parent ? "rgba(0,0,0,.08)" : "rgba(0,0,0,.035)");
+    ctx.fill();
   }
 
-  function draw(now) {
-    const t = (now - t0) / 1000;
-    ctx.clearRect(0, 0, W, H);
-    const h = head();
-    const breeze = still ? 0 : Math.sin(t * 0.9) * 0.012;
-    const hx = h.x + breeze * H * 0.6, hy = h.y;
+  function setCenter() {
+    var t, z, d;
+    if (hoverIdx >= 0 && slices[hoverIdx]) {
+      var s = slices[hoverIdx];
+      if (s.small) { t = s.count + " smaller items"; z = fmt(s.bytes); d = "too small to draw"; }
+      else { t = s.node.name; z = fmt(s.node.size); d = describe(s.node); }
+    } else if (listHover) { t = listHover.name; z = fmt(listHover.size); d = describe(listHover); }
+    else if (hoverCenter && focus.parent) { t = "Back to " + focus.parent.name; z = fmt(focus.parent.size); d = "click to go up"; }
+    else { t = focus.name; z = fmt(focus.size); d = describe(focus); }
+    centerEl.innerHTML = "";
+    var b = document.createElement("b"); b.textContent = t;
+    var st = document.createElement("strong"); st.textContent = z;
+    var sm = document.createElement("small"); sm.textContent = d;
+    centerEl.appendChild(b); centerEl.appendChild(st); centerEl.appendChild(sm);
+    // the label scales with the chart so it always fits inside the middle circle
+    var g = geo();
+    centerEl.style.width = (g.inner * 1.7) + "px";
+    b.style.fontSize = Math.max(10, Math.min(14, g.inner * 0.15)) + "px";
+    st.style.fontSize = Math.max(14, Math.min(26, g.inner * 0.27)) + "px";
+    sm.style.fontSize = Math.max(9, Math.min(12, g.inner * 0.12)) + "px";
+    sm.style.display = g.inner < 60 ? "none" : "";
+  }
+  function describe(n) {
+    if (n.hidden) return "system, snapshots, purgeable";
+    if (n.kids) { var c = count(n); return c.toLocaleString() + (c === 1 ? " file" : " files"); }
+    var m = /\.([a-z0-9]+)$/i.exec(n.name);
+    return m ? m[1].toUpperCase() + " file" : "file";
+  }
 
-    // stem
-    ctx.strokeStyle = "#5f8a5a"; ctx.lineWidth = 4; ctx.lineCap = "round";
-    ctx.beginPath(); ctx.moveTo(W * 0.5 - 8, H + 10);
-    ctx.quadraticCurveTo(W * 0.5 + 10, H * 0.72, hx, hy + 6); ctx.stroke();
-    // a leaf
-    ctx.fillStyle = "#4e7a4c";
-    ctx.beginPath(); ctx.moveTo(W * 0.5 - 2, H * 0.9);
-    ctx.quadraticCurveTo(W * 0.5 - 70, H * 0.82, W * 0.5 - 92, H * 0.74);
-    ctx.quadraticCurveTo(W * 0.5 - 40, H * 0.86, W * 0.5 - 2, H * 0.93); ctx.fill();
-
-    // a soft glow behind the head, like it's catching moonlight
-    const g = ctx.createRadialGradient(hx, hy, 0, hx, hy, h.R * 1.5);
-    g.addColorStop(0, "rgba(246,243,234,.10)"); g.addColorStop(1, "rgba(246,243,234,0)");
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(hx, hy, h.R * 1.5, 0, 6.283); ctx.fill();
-
-    let attached = 0, alive = 0;
-    const since = now - blownAt;
-    for (const s of seeds) {
-      const shade = 0.55 + 0.45 * (s.depth + 1) / 2;
-      if (state === "blowing" && !s.free && since > s.delay) s.free = true;
-      if (s.free) {
-        if (s.life <= 0) continue;
-        alive++;
-        s.sway += 0.03;
-        s.x += s.vx + Math.sin(s.sway) * 0.35;
-        s.y += s.vy + Math.cos(s.sway * 0.7) * 0.2;
-        s.vy -= 0.004; s.vx *= 0.999;
-        s.rot += s.vr + Math.sin(s.sway) * 0.004;
-        if (s.x > W + 40 || s.y < -40) s.life = 0; else s.life -= 0.0016;
-        drawSeed(s.x, s.y, s.rot, h.R * 0.5, Math.max(0, Math.min(1, s.life)) * shade);
-      } else {
-        if (state === "growing") s.grow = Math.min(1, Math.max(0, (since - s.delay) / 700));
-        if (state === "growing" || state === "full" || state === "blowing") {
-          attached++;
-          const L = h.R * s.len;
-          const ex = hx + s.dx * L * s.grow, ey = hy + s.dy * L * s.grow;
-          ctx.strokeStyle = `rgba(246,243,234,${0.35 * shade * s.grow})`; ctx.lineWidth = 0.8;
-          ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(ex, ey); ctx.stroke();
-          drawSeed(ex, ey, Math.atan2(s.dy, s.dx) + Math.PI / 2, h.R * 0.5 * Math.max(0.15, s.grow), shade * s.grow);
-        }
-      }
+  var listHover = null;
+  function renderList() {
+    listEl.innerHTML = "";
+    var head = document.createElement("div"); head.className = "list-head";
+    var hb = document.createElement("b"); hb.textContent = focus.name;
+    var hs = document.createElement("small"); hs.textContent = fmt(focus.size) + " · " + describe(focus);
+    head.appendChild(hb); head.appendChild(hs); listEl.appendChild(head);
+    focus.kids.slice(0, 60).forEach(function (n) {
+      var row = document.createElement("button"); row.type = "button"; row.className = "row" + (isCollected(n) ? " picked" : "");
+      var nm = document.createElement("span"); nm.className = "nm";
+      var sw = document.createElement("i");
+      var idx = -1; for (var i = 0; i < slices.length; i++) if (slices[i].node === n && !slices[i].small) { idx = i; break; }
+      sw.style.background = idx >= 0 ? color(slices[idx], false) : (dark.matches ? "rgba(255,255,255,.2)" : "rgba(0,0,0,.14)");
+      var label = document.createElement("span"); label.textContent = n.name + (n.kids ? "" : "");
+      nm.appendChild(sw); nm.appendChild(label);
+      var sz = document.createElement("span"); sz.className = "sz"; sz.textContent = fmt(n.size);
+      var bar = document.createElement("span"); bar.className = "bar";
+      var fill = document.createElement("b"); fill.style.width = Math.max(1, 100 * n.size / focus.size) + "%"; bar.appendChild(fill);
+      row.appendChild(nm); row.appendChild(sz); row.appendChild(bar);
+      row.title = n.kids ? "Open " + n.name : (n.hidden ? "Hidden space can't be removed" : "Collect " + n.name);
+      row.addEventListener("mouseenter", function () { listHover = n; draw(); setCenter(); });
+      row.addEventListener("mouseleave", function () { if (listHover === n) { listHover = null; draw(); setCenter(); } });
+      row.addEventListener("click", function () { activate(n); });
+      listEl.appendChild(row);
+    });
+    if (focus.kids.length > 60) {
+      var more = document.createElement("div"); more.className = "list-head";
+      var ms = document.createElement("small"); ms.textContent = "and " + (focus.kids.length - 60) + " smaller items";
+      more.appendChild(ms); listEl.appendChild(more);
     }
-    // the little dome the seeds grow from
-    ctx.fillStyle = "#b99a55"; ctx.beginPath(); ctx.arc(hx, hy, h.R * 0.08, 0, 6.283); ctx.fill();
-
-    if (state === "blowing" && alive === 0 && since > 1500) state = "bare";
-    if (state === "growing" && seeds.every(s => s.grow >= 1)) state = "full";
   }
 
-  function loop(now) { draw(now); requestAnimationFrame(loop); }
+  function renderCrumbs() {
+    crumbsEl.innerHTML = "";
+    var trail = []; for (var n = focus; n; n = n.parent) trail.unshift(n);
+    trail.forEach(function (n, i) {
+      if (i) { var sp = document.createElement("span"); sp.textContent = "›"; crumbsEl.appendChild(sp); }
+      var b = document.createElement("button"); b.type = "button"; b.textContent = n.name; if (n === focus) b.className = "here";
+      b.addEventListener("click", function () { go(n); });
+      crumbsEl.appendChild(b);
+    });
+  }
 
-  build();
-  resize();
-  addEventListener("resize", resize);
-  canvas.addEventListener("click", blow);
-  canvas.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); blow(); } });
-  if (!still) requestAnimationFrame(loop);
+  function renderCollector() {
+    var txt = document.getElementById("colTxt"), total = collected.reduce(function (s, n) { return s + n.size; }, 0);
+    if (!collected.length) txt.innerHTML = "<span>Collector is empty. Click files to collect them.</span>";
+    else {
+      txt.textContent = "";
+      var b = document.createElement("b"); b.textContent = fmt(total);
+      txt.appendChild(document.createTextNode(collected.length + (collected.length === 1 ? " item · " : " items · ")));
+      txt.appendChild(b);
+      txt.appendChild(document.createTextNode(" · " + collected.map(function (n) { return n.name; }).join(", ")));
+    }
+    document.getElementById("colTrash").disabled = !collected.length;
+    document.getElementById("colClear").disabled = !collected.length;
+  }
+
+  function refresh() { layout(); hoverIdx = -1; draw(); setCenter(); renderList(); renderCrumbs(); renderCollector(); }
+
+  function go(n) {
+    if (!n.kids) return;
+    focus = n; listHover = null; hoverCenter = false;
+    refresh();
+    if (!calm) {
+      anim = 0; var t0 = performance.now();
+      (function step(t) { anim = Math.min(1, (t - t0) / 320); anim = 1 - Math.pow(1 - anim, 3); draw(); if (anim < 1) requestAnimationFrame(step); })(t0);
+    }
+  }
+
+  function activate(n) {
+    if (n.kids) return go(n);
+    if (n.hidden) return;
+    var i = collected.indexOf(n);
+    if (i >= 0) collected.splice(i, 1); else if (!isCollected(n)) collected.push(n);
+    draw(); renderList(); renderCollector();
+  }
+
+  function hit(e) {
+    var r = canvas.getBoundingClientRect(), g = geo();
+    var x = (e.clientX - r.left) * (size / r.width) - g.c, y = (e.clientY - r.top) * (size / r.height) - g.c;
+    var d = Math.sqrt(x * x + y * y);
+    if (d <= g.inner) return { center: true };
+    var depth = Math.floor((d - g.inner) / g.ring) + 1;
+    if (depth > RINGS) return {};
+    var a = Math.atan2(x, -y); if (a < 0) a += Math.PI * 2;
+    for (var i = 0; i < slices.length; i++) { var s = slices[i]; if (s.depth === depth && a >= s.a0 && a < s.a1) return { idx: i }; }
+    return {};
+  }
+
+  canvas.addEventListener("mousemove", function (e) {
+    var h = hit(e), idx = h.idx === undefined ? -1 : h.idx, c = !!h.center;
+    if (idx !== hoverIdx || c !== hoverCenter) { hoverIdx = idx; hoverCenter = c; draw(); setCenter(); }
+  });
+  canvas.addEventListener("mouseleave", function () { hoverIdx = -1; hoverCenter = false; draw(); setCenter(); });
+  canvas.addEventListener("click", function (e) {
+    var h = hit(e);
+    if (h.center) { if (focus.parent) go(focus.parent); return; }
+    if (h.idx === undefined) return;
+    var s = slices[h.idx];
+    if (s.small) { if (s.node !== focus) go(s.node); return; }
+    activate(s.node);
+  });
+
+  document.getElementById("colClear").addEventListener("click", function () { collected = []; draw(); renderList(); renderCollector(); });
+  document.getElementById("colTrash").addEventListener("click", function () {
+    collected.forEach(function (n) {
+      var p = n.parent; if (!p) return;
+      p.kids.splice(p.kids.indexOf(n), 1);
+      for (var a = p; a; a = a.parent) fix(a);
+    });
+    collected = [];
+    refresh();
+  });
+  document.getElementById("reset").addEventListener("click", start);
+
+  function fit() {
+    var box = document.getElementById("chartBox");
+    var w = box.clientWidth - 36;
+    size = Math.max(260, Math.min(520, w));
+    draw(); setCenter();
+  }
+
+  function start() {
+    root = build(DISK, null); focus = root; collected = []; listHover = null;
+    refresh(); fit();
+  }
+
+  window.addEventListener("resize", fit);
+  if (dark.addEventListener) dark.addEventListener("change", function () { draw(); renderList(); });
+  start();
+
+  // cards, steps and questions float in as they scroll into view
+  (function () {
+    var els = document.querySelectorAll(".feat, .step, .note, details, .split > div, .band");
+    if (!("IntersectionObserver" in window) || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    var io = new IntersectionObserver(function (list) {
+      list.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
+    }, { rootMargin: "0px 0px -8% 0px" });
+    Array.prototype.forEach.call(els, function (el, i) {
+      el.classList.add("reveal");
+      el.style.transitionDelay = ((i % 3) * 70) + "ms";
+      io.observe(el);
+    });
+  })();
+
+  // copy the build commands
+  document.getElementById("copyBtn").addEventListener("click", function () {
+    var text = document.getElementById("buildCmds").innerText.split("\n").filter(function (l) { return l.indexOf("$ ") === 0; }).map(function (l) { return l.slice(2); }).join("\n");
+    var btn = this;
+    (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () { btn.textContent = "Copied!"; }, function () { btn.textContent = "Select and copy"; });
+    setTimeout(function () { btn.textContent = "Copy"; }, 1600);
+  });
 })();
 </script>
 </body>
